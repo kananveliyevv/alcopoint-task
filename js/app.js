@@ -244,13 +244,19 @@
 
   function fd(d) {
     if (!d) return "—";
-    const p = d.split("-");
+    const [datePart, timePart] = String(d).split("T");
+    const p = datePart.split("-");
     if (p.length !== 3) return d;
     const day = parseInt(p[2], 10);
     const month = parseInt(p[1], 10);
     const year = p[0];
     if (isNaN(day) || isNaN(month) || month < 1 || month > 12) return d;
-    return `${day} ${AZ_MONTHS[month - 1]} ${year}`;
+    const base = `${day} ${AZ_MONTHS[month - 1]} ${year}`;
+    if (!timePart) return base;
+    const [hh, mm] = timePart.split(":");
+    const h = String(parseInt(hh, 10)).padStart(2, "0");
+    const m = String(parseInt(mm || "0", 10)).padStart(2, "0");
+    return `${base} · SAAT ${h}:${m}`;
   }
 
   function initDateSelects(prefix) {
@@ -275,12 +281,32 @@
     }).join("");
   }
 
+  function initTimeSelects(prefix) {
+    const hSel = document.getElementById(prefix + "-h");
+    if (!hSel || hSel.options.length) return;
+    hSel.innerHTML = Array.from({ length: 24 }, (_, i) => {
+      const hh = String(i).padStart(2, "0");
+      return `<option value="${i}">${hh}:00</option>`;
+    }).join("");
+  }
+
   function getDateFromSelects(prefix) {
     const d = document.getElementById(prefix + "-d")?.value;
     const m = document.getElementById(prefix + "-m")?.value;
     const y = document.getElementById(prefix + "-y")?.value;
     if (!d || !m || !y) return "";
     return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  function getDateTimeFromSelects(prefix) {
+    const date = getDateFromSelects(prefix);
+    if (!date) return "";
+    const hEl = document.getElementById(prefix + "-h");
+    if (!hEl) return date;
+    const hv = hEl.value;
+    if (hv === undefined || hv === null || hv === "") return date;
+    const hh = String(parseInt(hv, 10)).padStart(2, "0");
+    return `${date}T${hh}:00`;
   }
 
   function setDateToSelects(prefix, iso) {
@@ -296,6 +322,30 @@
     if (yEl) yEl.value = p[0];
   }
 
+  function setDateTimeToSelects(prefix, iso, defaultHour) {
+    initDateSelects(prefix);
+    initTimeSelects(prefix);
+    if (!iso) return;
+    const [datePart, timePart] = String(iso).split("T");
+    const p = datePart.split("-");
+    if (p.length !== 3) return;
+    const dEl = document.getElementById(prefix + "-d");
+    const mEl = document.getElementById(prefix + "-m");
+    const yEl = document.getElementById(prefix + "-y");
+    const hEl = document.getElementById(prefix + "-h");
+    if (dEl) dEl.value = parseInt(p[2], 10);
+    if (mEl) mEl.value = parseInt(p[1], 10);
+    if (yEl) yEl.value = p[0];
+    if (hEl) {
+      if (timePart) {
+        const hh = timePart.split(":")[0];
+        hEl.value = String(parseInt(hh || "0", 10));
+      } else if (defaultHour !== undefined) {
+        hEl.value = String(parseInt(defaultHour, 10));
+      }
+    }
+  }
+
   function clearDateSelects(prefix) {
     initDateSelects(prefix);
     const today = new Date();
@@ -305,6 +355,13 @@
     if (dEl) dEl.value = today.getDate();
     if (mEl) mEl.value = today.getMonth() + 1;
     if (yEl) yEl.value = today.getFullYear();
+  }
+
+  function clearDateTimeSelects(prefix, defaultHour) {
+    clearDateSelects(prefix);
+    initTimeSelects(prefix);
+    const hEl = document.getElementById(prefix + "-h");
+    if (hEl && defaultHour !== undefined) hEl.value = String(parseInt(defaultHour, 10));
   }
   function notify(msg, type = "ok") {
     const el = document.createElement("div");
@@ -339,6 +396,16 @@
     try {
       localStorage.setItem("alcopoint_theme", currentTheme);
     } catch (_) {}
+
+    // Loqo light/dark rejimə görə dəyişir ki, oxunaqlılıq qorunsun.
+    const applyLogo = (id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const src = isLight ? el.dataset.lightSrc : el.dataset.darkSrc;
+      if (src) el.src = src;
+    };
+    applyLogo("login-logo-img");
+    applyLogo("sidebar-logo-img");
   }
   function loadTheme() {
     let saved = null;
@@ -378,13 +445,17 @@
       const pa = a.waitingManager ? 0 : 1;
       const pb = b.waitingManager ? 0 : 1;
       if (pa !== pb) return pa - pb;
-      const da = a.deadline || "9999";
-      const db2 = b.deadline || "9999";
-      return da.localeCompare(db2);
+      const da = deadlineMs(a.deadline) ?? 999999999999;
+      const db2 = deadlineMs(b.deadline) ?? 999999999999;
+      return da - db2;
     });
   }
   function deadlineMs(d) {
     if (!d) return null;
+    if (String(d).includes("T")) {
+      const ms = new Date(d).getTime();
+      return isNaN(ms) ? null : ms;
+    }
     const [y, m, day] = d.split("-").map(Number);
     return new Date(y, m - 1, day, 23, 59, 59).getTime();
   }
@@ -892,6 +963,10 @@
     editingTaskId = id || null;
     initDateSelects("f-start");
     initDateSelects("f-deadline");
+    initTimeSelects("f-start");
+    initTimeSelects("f-deadline");
+    const newDeptInput = document.getElementById("f-new-dept");
+    if (newDeptInput) newDeptInput.value = "";
     document.getElementById("modal-task-title").textContent = id ? "Tapşırığı düzəlt" : "Yeni Tapşırıq";
     const fw = document.getElementById("f-worker");
     fw.innerHTML = db.users.map((u) => `<option>${esc(u.name)}</option>`).join("");
@@ -908,16 +983,17 @@
       document.getElementById("f-task").value = t.task;
       fw.value = t.worker;
       deptSel.value = t.dept;
-      setDateToSelects("f-start", t.start || "");
-      setDateToSelects("f-deadline", t.deadline || "");
+      setDateTimeToSelects("f-start", t.start || "", 9);
+      setDateTimeToSelects("f-deadline", t.deadline || "", 23);
       document.getElementById("f-priority").value = t.priority;
       document.getElementById("f-status").value = t.status;
       document.getElementById("f-note").value = t.note || "";
     } else {
       document.getElementById("f-task").value = "";
       document.getElementById("f-note").value = "";
-      clearDateSelects("f-start");
-      clearDateSelects("f-deadline");
+      const nowHour = parseInt(getBakuDateParts().hour, 10);
+      clearDateTimeSelects("f-start", isNaN(nowHour) ? 9 : nowHour);
+      clearDateTimeSelects("f-deadline", 23);
       document.getElementById("f-status").value = STATUS.WAIT;
     }
     document.getElementById("task-modal").style.display = "flex";
@@ -940,12 +1016,20 @@
       task,
       worker: document.getElementById("f-worker").value,
       dept: document.getElementById("f-dept").value,
-      start: getDateFromSelects("f-start"),
-      deadline: getDateFromSelects("f-deadline"),
+      start: getDateTimeFromSelects("f-start"),
+      deadline: getDateTimeFromSelects("f-deadline"),
       priority: document.getElementById("f-priority").value,
       status: document.getElementById("f-status").value,
       note: document.getElementById("f-note").value
     };
+
+    // Yeni şöbə daxil edilibsə, onu sistemə əlavə edib seçim kimi götürürük.
+    const modalNewDept = document.getElementById("f-new-dept")?.value?.trim();
+    if (modalNewDept) {
+      const ok = window.addDepartment(modalNewDept);
+      if (!ok) return;
+      payload.dept = modalNewDept;
+    }
     if (payload.status === STATUS.PENDING_MANAGER) payload.waitingManager = true;
 
     if (editingTaskId) {
@@ -1181,7 +1265,8 @@
           (!df || i.date === df) &&
           (!sf || i.status === sf)
       )
-      .reverse();
+      // Tarixə görə sıralama: ən yenisi yuxarıda (YYYY-MM-DD olduğuna görə lexicographic müqayisə işləyir)
+      .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.id).localeCompare(String(a.id)));
     const el = document.getElementById("import-list");
     if (!list.length) {
       el.innerHTML = '<div class="empty"><div class="ico">📋</div><p>Qeyd tapılmadı</p></div>';
@@ -1297,6 +1382,11 @@
         .join("") +
       "</div>";
 
+    const nd = document.getElementById("new-dept-name");
+    if (nd) nd.value = "";
+    const deptList = document.getElementById("departments-list");
+    if (deptList) deptList.textContent = db.departments.map((d) => d.name).join(", ");
+
     const fbStatus = document.getElementById("firebase-status-text");
     if (fbStatus) {
       fbStatus.textContent = FirebaseService.isConfigured()
@@ -1338,6 +1428,45 @@
     u.pass = inp.value;
     saveDB();
     notify(u.name + " şifrəsi yeniləndi ✓");
+  };
+
+  window.addDepartment = function (nameOverride) {
+    if (!currentUser || currentUser.role !== "admin") {
+      notify("Yalnız rəhbər əlavə edə bilər", "err");
+      return;
+    }
+    const inp = document.getElementById("new-dept-name");
+    const modalInp = document.getElementById("f-new-dept");
+    const name =
+      typeof nameOverride === "string"
+        ? nameOverride.trim()
+        : inp?.value?.trim() || modalInp?.value?.trim();
+    if (!name) {
+      notify("Şöbə adı daxil edin", "err");
+      return false;
+    }
+    if (
+      db.departments.some(
+        (d) => String(d.name).toLowerCase() === name.toLowerCase()
+      )
+    ) {
+      notify("Bu şöbə mövcuddur", "err");
+      return false;
+    }
+    db.departments.push({ id: "d_" + name.replace(/\s/g, "_"), name });
+    saveDB();
+
+    // Settings + modal inputlarını təmizlə
+    if (inp) inp.value = "";
+    if (modalInp) modalInp.value = "";
+    renderSettings();
+    const deptSel = document.getElementById("f-dept");
+    if (deptSel) {
+      deptSel.innerHTML = db.departments.map((d) => `<option>${esc(d.name)}</option>`).join("");
+      deptSel.value = name;
+    }
+    notify("Şöbə əlavə edildi ✓");
+    return true;
   };
 
   window.clearTasks = function () {
@@ -1408,7 +1537,7 @@
   function buildPdfHtml(title, subtitle, statsRows, taskRows, date) {
     const statCards = statsRows.map(([label, val, color]) =>
       `<div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 10px;text-align:center;border-top:3px solid ${color}">
-        <div style="font-size:26px;font-weight:700;color:${color};font-family:'DM Mono',monospace">${val}</div>
+        <div style="font-size:26px;font-weight:700;color:${color};font-family:'TT Wellingtons','DM Mono',monospace">${val}</div>
         <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">${label}</div>
       </div>`
     ).join("");
@@ -1421,6 +1550,7 @@
         <td style="padding:9px 10px;font-size:12px;font-weight:600;color:#0f172a;max-width:200px">${t.task}</td>
         <td style="padding:9px 10px;font-size:12px;color:#334155">${t.worker}</td>
         <td style="padding:9px 10px;font-size:12px;color:#334155">${t.dept}</td>
+        <td style="padding:9px 10px;font-size:12px;color:#334155;white-space:nowrap">${fd(t.start)}</td>
         <td style="padding:9px 10px;font-size:12px;color:#334155;white-space:nowrap">${fd(t.deadline)}</td>
         <td style="padding:9px 10px">
           <span style="background:${sc.bg};color:${sc.text};border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap">
@@ -1432,15 +1562,20 @@
     }).join("");
 
     return `<div id="pdf-render-root" style="
-        width:900px;font-family:'DM Sans',Arial,sans-serif;
+        width:900px;font-family:'TT Wellingtons','DM Sans',Arial,sans-serif;
         background:#ffffff;padding:40px;box-sizing:border-box;color:#0f172a">
 
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #f1f5f9">
-        <div>
-          <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">ALCOPOINT — İŞ PLANLAMASI SİSTEMİ</div>
-          <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 4px">${title}</h1>
-          ${subtitle ? `<div style="font-size:13px;color:#64748b">${subtitle}</div>` : ""}
+        <div style="display:flex;align-items:flex-start;gap:14px">
+          <div style="flex-shrink:0">
+            <img src="./logo-light.png" alt="ALCOPOINT" style="height:34px;object-fit:contain">
+          </div>
+          <div>
+            <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">ALCOPOINT — İŞ PLANLAMASI SİSTEMİ</div>
+            <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 4px">${title}</h1>
+            ${subtitle ? `<div style="font-size:13px;color:#64748b">${subtitle}</div>` : ""}
+          </div>
         </div>
         <div style="text-align:right">
           <div style="font-size:11px;color:#94a3b8">${date}</div>
@@ -1463,6 +1598,7 @@
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Tapşırıq</th>
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">İşçi</th>
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Şöbə</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;white-space:nowrap">Başlama</th>
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;white-space:nowrap">Deadline</th>
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Status</th>
               <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Prioritet</th>
@@ -1480,7 +1616,7 @@
     </div>`;
   }
 
-  function renderHtmlToPdf(html, filename) {
+  async function renderHtmlToPdf(html, filename, retryWithoutImages = false) {
     if (typeof jspdf === "undefined" || typeof html2canvas === "undefined") {
       notify("PDF kitabxanası yüklənməyib", "err");
       return;
@@ -1494,30 +1630,101 @@
 
     const el = wrap.querySelector("#pdf-render-root") || wrap;
 
-    html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-      width: el.scrollWidth,
-      windowWidth: el.scrollWidth + 80
-    }).then((canvas) => {
+    try {
+      if (!retryWithoutImages) {
+        // Fontlar və şəkillər tam yüklənməsə, html2canvas boş/görünməyən hissələr sala bilər.
+        if (document.fonts && document.fonts.ready) {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        }
+
+        const imgs = Array.from(el.querySelectorAll("img"));
+        await Promise.all(
+          imgs.map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((resolve) => {
+                  const t = setTimeout(() => resolve(), 2500);
+                  img.onload = () => {
+                    clearTimeout(t);
+                    resolve();
+                  };
+                  img.onerror = () => {
+                    clearTimeout(t);
+                    resolve();
+                  };
+                })
+          )
+        );
+      } else {
+        // Logo və digər şəkillər bəzi hallarda "tainted canvas" yaradır.
+        // Exportu mütləq çıxarmaq üçün şəkilləri DOM-dan silirik.
+        Array.from(el.querySelectorAll("img")).forEach((img) => img.remove());
+      }
+
+      const scale = el.scrollHeight > 3500 ? 1.5 : 2;
+      const canvas = await html2canvas(el, {
+        scale,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        windowWidth: el.scrollWidth + 80,
+        windowHeight: el.scrollHeight + 80
+      });
+
       document.body.removeChild(wrap);
       const { jsPDF } = jspdf;
-      const imgData = canvas.toDataURL("image/jpeg", 0.92);
-      const pxW = canvas.width;
-      const pxH = canvas.height;
+      let imgData;
+      try {
+        imgData = canvas.toDataURL("image/jpeg", 0.92);
+      } catch (e) {
+        // toDataURL zamanı "SecurityError: tainted canvas" ola bilər.
+        throw e;
+      }
+
+      // A4 üzrə çox-səhifəli eksport (yarımçıq kəsilməni azaldır).
       const a4w = 210;
-      const a4h = Math.round((pxH / pxW) * a4w);
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [a4w, a4h] });
-      doc.addImage(imgData, "JPEG", 0, 0, a4w, a4h);
+      const a4h = 297;
+      const imgHeightMm = (canvas.height * a4w) / canvas.width;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const totalPages = Math.max(1, Math.ceil(imgHeightMm / a4h));
+
+      for (let i = 0; i < totalPages; i++) {
+        if (i > 0) doc.addPage();
+        const y = -i * a4h;
+        doc.addImage(imgData, "JPEG", 0, y, a4w, imgHeightMm);
+      }
+
       doc.save(filename);
       notify("PDF yükləndi ✓");
-    }).catch((e) => {
-      document.body.removeChild(wrap);
+    } catch (e) {
+      // Retry: şəkil səbəbli taint ola bilər.
+      const msg = e && e.message ? e.message : String(e);
+      const security =
+        /taint|Tainted|SecurityError|toDataURL|blocked/i.test(msg) || e?.name === "SecurityError";
+
+      try {
+        if (document.body.contains(wrap)) document.body.removeChild(wrap);
+      } catch (_) {}
+
+      if (!retryWithoutImages) {
+        // Birinci cəhd uğursuz oldusa (taint, ölçü, timing və s.) ən azından şəkilləri çıxarıb ikinci cəhdi edək.
+        notify("PDF yenidən cəhd edilir (şəkilsiz)...", "err");
+        return renderHtmlToPdf(html, filename, true);
+      }
+
       console.error("PDF xəta:", e);
-      notify("PDF yaradılmadı: " + e.message, "err");
-    });
+      notify(
+        "PDF yaradılmadı: " +
+          (e?.name || "Error") +
+          (e?.message ? " — " + e.message : ""),
+        "err"
+      );
+    }
   }
 
   window.exportAllTasksPdf = function () {
