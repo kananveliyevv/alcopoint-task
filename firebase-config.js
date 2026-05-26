@@ -1,7 +1,7 @@
 window.FIREBASE_CONFIG = {
   apiKey: "AIzaSyCNCVcl7eqaKNdU2757efzZ2mHkQ5qLIBU",
   authDomain: "alcopoint-task.firebaseapp.com",
-  databaseURL: "https://alcopoint-task.github.io",
+  databaseURL: "https://alcopoint-task-default-rtdb.firebaseio.com",
   projectId: "alcopoint-task",
   storageBucket: "alcopoint-task.firebasestorage.app",
   messagingSenderId: "647760009556",
