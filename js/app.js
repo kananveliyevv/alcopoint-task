@@ -194,6 +194,39 @@
     const c = p === "Kritik" ? "k" : p === "Yüksək" ? "y" : "o";
     return `<span class="prio"><span class="pd ${c}"></span>${esc(p)}</span>`;
   }
+  function getBakuDateParts() {
+    const now = new Date();
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Baku",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+    const parts = fmt.formatToParts(now).reduce((acc, p) => {
+      acc[p.type] = p.value;
+      return acc;
+    }, {});
+    return {
+      day: parts.day,
+      month: (parts.month || "").toUpperCase(),
+      year: parts.year,
+      weekday: (parts.weekday || "").toUpperCase(),
+      hour: parts.hour,
+      minute: parts.minute
+    };
+  }
+  function formatBakuHeader() {
+    const d = getBakuDateParts();
+    return `${d.day} ${d.month} ${d.year} · SAAT ${d.hour}:${d.minute} · BAKI VAXTI (${d.weekday})`;
+  }
+  function formatBakuForPdf() {
+    const d = getBakuDateParts();
+    return `${d.day} ${d.month} ${d.year} ${d.hour}:${d.minute} (Bakı vaxtı)`;
+  }
   const AZ_MONTHS = [
     "Yanvar",
     "Fevral",
@@ -575,12 +608,7 @@
     const av = document.getElementById("sidebar-avatar");
     av.textContent = currentUser.name[0].toUpperCase();
     av.className = "avatar " + (isAdmin ? "admin" : "worker");
-    document.getElementById("dash-date").textContent = new Date().toLocaleDateString("az-AZ", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    });
+    document.getElementById("dash-date").textContent = formatBakuHeader();
     updateApprovalBadge();
     startCountdowns();
     if (isAdmin) {
@@ -1361,90 +1389,187 @@
     r.readAsText(file);
   };
 
-  // ─── PDF Export ───
-  function loadLogoForPdf(doc, x, y, cb) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = function () {
-      try {
-        doc.addImage(img, "PNG", x, y, 40, 12);
-      } catch (_) {}
-      cb();
-    };
-    img.onerror = cb;
-    img.src = "./logo.png";
+  // ─── PDF Export (html2canvas əsaslı — tam Azərbaycanca dəstək) ───
+
+  function pdfStatusColor(s) {
+    if (isDoneStatus(s)) return { bg: "#e6f9ee", text: "#15803d", dot: "#22c55e" };
+    if (s === STATUS.LATE) return { bg: "#fee2e2", text: "#dc2626", dot: "#f87171" };
+    if (s === STATUS.PENDING_MANAGER) return { bg: "#fff7e6", text: "#b45309", dot: "#fbbf24" };
+    if (s === STATUS.PROGRESS) return { bg: "#dbeafe", text: "#2563eb", dot: "#60a5fa" };
+    return { bg: "#f1f5f9", text: "#475569", dot: "#94a3b8" };
+  }
+
+  function pdfPrioColor(p) {
+    if (p === "Kritik") return "#dc2626";
+    if (p === "Yüksək") return "#b45309";
+    return "#2563eb";
+  }
+
+  function buildPdfHtml(title, subtitle, statsRows, taskRows, date) {
+    const statCards = statsRows.map(([label, val, color]) =>
+      `<div style="flex:1;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 10px;text-align:center;border-top:3px solid ${color}">
+        <div style="font-size:26px;font-weight:700;color:${color};font-family:'DM Mono',monospace">${val}</div>
+        <div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-top:4px">${label}</div>
+      </div>`
+    ).join("");
+
+    const taskTable = taskRows.map((t, i) => {
+      const sc = pdfStatusColor(t.status);
+      const pc = pdfPrioColor(t.priority);
+      return `<tr style="background:${i % 2 === 0 ? "#ffffff" : "#f8fafc"}">
+        <td style="padding:9px 10px;font-size:11px;color:#64748b;font-family:monospace;white-space:nowrap">${t.id}</td>
+        <td style="padding:9px 10px;font-size:12px;font-weight:600;color:#0f172a;max-width:200px">${t.task}</td>
+        <td style="padding:9px 10px;font-size:12px;color:#334155">${t.worker}</td>
+        <td style="padding:9px 10px;font-size:12px;color:#334155">${t.dept}</td>
+        <td style="padding:9px 10px;font-size:12px;color:#334155;white-space:nowrap">${fd(t.deadline)}</td>
+        <td style="padding:9px 10px">
+          <span style="background:${sc.bg};color:${sc.text};border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;white-space:nowrap">
+            <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${sc.dot};margin-right:4px;vertical-align:middle"></span>${t.status}
+          </span>
+        </td>
+        <td style="padding:9px 10px"><span style="color:${pc};font-size:11px;font-weight:600">${t.priority}</span></td>
+      </tr>`;
+    }).join("");
+
+    return `<div id="pdf-render-root" style="
+        width:900px;font-family:'DM Sans',Arial,sans-serif;
+        background:#ffffff;padding:40px;box-sizing:border-box;color:#0f172a">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #f1f5f9">
+        <div>
+          <div style="font-size:9px;letter-spacing:2px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px">ALCOPOINT — İŞ PLANLAMASI SİSTEMİ</div>
+          <h1 style="font-size:22px;font-weight:700;color:#0f172a;margin:0 0 4px">${title}</h1>
+          ${subtitle ? `<div style="font-size:13px;color:#64748b">${subtitle}</div>` : ""}
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:#94a3b8">${date}</div>
+          <div style="margin-top:8px;background:#f5c518;color:#0a0c10;font-size:11px;font-weight:700;padding:4px 12px;border-radius:6px;display:inline-block">ALCOPOINT</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div style="display:flex;gap:12px;margin-bottom:28px">${statCards}</div>
+
+      <!-- Table -->
+      <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+        <div style="background:#f8fafc;padding:12px 16px;border-bottom:1px solid #e2e8f0;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:.5px">
+          Tapşırıqlar — ${taskRows.length} ədəd
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:#f1f5f9">
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;white-space:nowrap">ID</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Tapşırıq</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">İşçi</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Şöbə</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase;white-space:nowrap">Deadline</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Status</th>
+              <th style="padding:9px 10px;text-align:left;font-size:10px;color:#94a3b8;font-weight:600;text-transform:uppercase">Prioritet</th>
+            </tr>
+          </thead>
+          <tbody>${taskTable}</tbody>
+        </table>
+      </div>
+
+      <!-- Footer -->
+      <div style="margin-top:24px;padding-top:16px;border-top:1px solid #f1f5f9;display:flex;justify-content:space-between;font-size:10px;color:#94a3b8">
+        <span>ALCOPOINT — İş Planlaması Sistemi</span>
+        <span>${date}</span>
+      </div>
+    </div>`;
+  }
+
+  function renderHtmlToPdf(html, filename) {
+    if (typeof jspdf === "undefined" || typeof html2canvas === "undefined") {
+      notify("PDF kitabxanası yüklənməyib", "err");
+      return;
+    }
+    notify("PDF hazırlanır...", "info");
+
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:fixed;left:-9999px;top:0;z-index:-1;background:#fff";
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap);
+
+    const el = wrap.querySelector("#pdf-render-root") || wrap;
+
+    html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: el.scrollWidth,
+      windowWidth: el.scrollWidth + 80
+    }).then((canvas) => {
+      document.body.removeChild(wrap);
+      const { jsPDF } = jspdf;
+      const imgData = canvas.toDataURL("image/jpeg", 0.92);
+      const pxW = canvas.width;
+      const pxH = canvas.height;
+      const a4w = 210;
+      const a4h = Math.round((pxH / pxW) * a4w);
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [a4w, a4h] });
+      doc.addImage(imgData, "JPEG", 0, 0, a4w, a4h);
+      doc.save(filename);
+      notify("PDF yükləndi ✓");
+    }).catch((e) => {
+      document.body.removeChild(wrap);
+      console.error("PDF xəta:", e);
+      notify("PDF yaradılmadı: " + e.message, "err");
+    });
   }
 
   window.exportAllTasksPdf = function () {
-    if (typeof jspdf === "undefined") {
-      notify("PDF kitabxanası yüklənməyib", "err");
-      return;
-    }
-    const { jsPDF } = jspdf;
-    const doc = new jsPDF();
-    const date = new Date().toLocaleString("az-AZ");
-    loadLogoForPdf(doc, 14, 10, () => {
-      doc.setFontSize(16);
-      doc.text("ALCOPOINT — Tapşırıq Hesabatı", 14, 32);
-      doc.setFontSize(10);
-      doc.text("Tarix: " + date, 14, 40);
-      const total = db.tasks.length;
-      const done = db.tasks.filter((t) => isDoneStatus(t.status)).length;
-      const late = db.tasks.filter((t) => t.status === STATUS.LATE).length;
-      const pending = db.tasks.filter((t) => t.waitingManager).length;
-      doc.text(`Cəmi: ${total} | Tamamlanan: ${done} | Gecikən: ${late} | Təsdiq gözləyən: ${pending}`, 14, 48);
+    const date = formatBakuForPdf();
+    const tasks = sortTasks(db.tasks);
+    const total = tasks.length;
+    const done = tasks.filter((t) => isDoneStatus(t.status)).length;
+    const late = tasks.filter((t) => t.status === STATUS.LATE).length;
+    const pending = tasks.filter((t) => t.waitingManager).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
 
-      let y = 58;
-      sortTasks(db.tasks).forEach((t) => {
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.setFontSize(9);
-        doc.text(
-          `${t.id} | ${t.task} | ${t.worker} | ${t.dept} | ${t.status} | ${fd(t.deadline)}`,
-          14,
-          y
-        );
-        y += 7;
-      });
-      doc.save("alcopoint_tasks_" + new Date().toISOString().split("T")[0] + ".pdf");
-      notify("PDF yükləndi ✓");
-    });
+    const stats = [
+      ["Cəmi tapşırıq", total, "#60a5fa"],
+      ["Tamamlanan", done, "#22c55e"],
+      ["Gecikən", late, "#f87171"],
+      ["Təsdiq gözləyən", pending, "#fbbf24"]
+    ];
+
+    const html = buildPdfHtml(
+      "Tapşırıq Hesabatı",
+      `Ümumi icra faizi: ${pct}%`,
+      stats,
+      tasks,
+      date
+    );
+    renderHtmlToPdf(html, "alcopoint_hesabat_" + new Date().toISOString().split("T")[0] + ".pdf");
   };
 
   window.exportWorkerPdf = function (workerName) {
-    if (typeof jspdf === "undefined") {
-      notify("PDF kitabxanası yüklənməyib", "err");
-      return;
-    }
-    const { jsPDF } = jspdf;
-    const doc = new jsPDF();
-    const my = db.tasks.filter((t) => t.worker === workerName);
-    const done = my.filter((t) => isDoneStatus(t.status)).length;
-    const date = new Date().toLocaleString("az-AZ");
+    const date = formatBakuForPdf();
+    const tasks = sortTasks(db.tasks.filter((t) => t.worker === workerName));
+    const total = tasks.length;
+    const done = tasks.filter((t) => isDoneStatus(t.status)).length;
+    const late = tasks.filter((t) => t.status === STATUS.LATE).length;
+    const pending = tasks.filter((t) => t.waitingManager).length;
+    const pct = total ? Math.round((done / total) * 100) : 0;
 
-    loadLogoForPdf(doc, 14, 10, () => {
-      doc.setFontSize(16);
-      doc.text("İşçi Performans Hesabatı", 14, 32);
-      doc.setFontSize(11);
-      doc.text(`İşçi: ${workerName}`, 14, 42);
-      doc.text(`Tarix: ${date}`, 14, 50);
-      doc.text(`Cəmi tapşırıq: ${my.length} | Tamamlanan: ${done} | Faiz: ${my.length ? Math.round((done / my.length) * 100) : 0}%`, 14, 58);
+    const stats = [
+      ["Cəmi tapşırıq", total, "#60a5fa"],
+      ["Tamamlanan", done, "#22c55e"],
+      ["Gecikən", late, "#f87171"],
+      ["İcra faizi", pct + "%", "#fbbf24"]
+    ];
 
-      let y = 68;
-      my.forEach((t) => {
-        if (y > 270) {
-          doc.addPage();
-          y = 20;
-        }
-        doc.setFontSize(9);
-        doc.text(`${t.id} | ${t.task} | ${t.status} | Deadline: ${fd(t.deadline)}`, 14, y);
-        y += 7;
-      });
-      doc.save("performans_" + workerName.replace(/\s/g, "_") + ".pdf");
-      notify("PDF yükləndi ✓");
-    });
+    const html = buildPdfHtml(
+      `${workerName} — Performans Hesabatı`,
+      `Şöbə: ${tasks[0]?.dept || "—"} · Dövriyyə: ${date}`,
+      stats,
+      tasks,
+      date
+    );
+    renderHtmlToPdf(html, "performans_" + workerName.replace(/\s/g, "_") + ".pdf");
   };
 
   // ─── Init ───
