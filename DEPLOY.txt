@@ -1,0 +1,17 @@
+# ALCOPOINT — Ready for Vercel
+
+## Deploy
+1. Upload this project to GitHub
+2. Import repository in Vercel
+3. Deploy
+
+## Firebase
+Already configured.
+
+## Important
+Add your Vercel domain to Firebase:
+
+Authentication -> Settings -> Authorized domains
+
+Example:
+alcopoint-task.vercel.app

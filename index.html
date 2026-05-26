@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALCOPOINT — İş Planlaması</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0c10;--bg2:#111318;--bg3:#181b22;--bg4:#1f232e;
+  --border:#252936;--border2:#2e3448;
+  --text:#e4e8f2;--text2:#8b94ad;--text3:#4f5875;
+  --yellow:#f5c518;--green:#22c55e;--green-bg:#051a0e;--green-border:#093d1e;
+  --blue:#60a5fa;--blue-bg:#06152b;--amber:#fbbf24;--amber-bg:#241a04;
+  --red:#f87171;--red-bg:#1f0808;--red-border:#3d1010;
+  --gray-bg:#161820;--purple:#a78bfa;
+}
+[data-theme="light"], html.theme-light{
+  --bg:#f3f6fb;--bg2:#ffffff;--bg3:#f7f9fc;--bg4:#eef3fb;
+  --border:#d9e1ef;--border2:#c7d2e6;
+  --text:#0f172a;--text2:#334155;--text3:#64748b;
+  --yellow:#d9a500;--green:#15803d;--green-bg:#dcfce7;--green-border:#86efac;
+  --blue:#2563eb;--blue-bg:#dbeafe;--amber:#b45309;--amber-bg:#ffedd5;
+  --red:#dc2626;--red-bg:#fee2e2;--red-border:#fca5a5;
+  --gray-bg:#e2e8f0;--purple:#7c3aed;
+}
+body{font-family:'TT Wellingtons','DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;position:relative;background:radial-gradient(ellipse at 40% 40%,#1a1500 0%,var(--bg) 65%)}
+[data-theme="light"] #login-screen,html.theme-light #login-screen{background:radial-gradient(ellipse at 40% 40%,#fff8e1 0%,var(--bg) 65%)}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:44px 40px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.6);position:relative}
+[data-theme="light"] .login-box,html.theme-light .login-box{box-shadow:0 12px 40px rgba(15,23,42,.12)}
+.login-theme-toggle{position:absolute;top:16px;right:16px;width:42px;height:42px;border-radius:12px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.login-theme-toggle:hover{color:var(--text);border-color:var(--yellow);background:var(--bg4)}
+.login-theme-toggle span{font-size:20px;line-height:1}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo img{height:44px;object-fit:contain}
+.login-logo p{font-size:12px;color:var(--text3);margin-top:10px;letter-spacing:1.5px;text-transform:uppercase}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--yellow);box-shadow:0 0 0 3px rgba(245,197,24,.1)}
+.date-group{display:grid;grid-template-columns:minmax(56px,1fr) minmax(100px,1.5fr) minmax(72px,1fr);gap:8px}
+.date-group select{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:10px 8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;width:100%}
+.date-group select:focus{border-color:var(--yellow)}
+@media(max-width:600px){
+  .date-group{grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .date-group select{padding:12px 6px;font-size:14px}
+}
+.field select option{background:var(--bg3)}
+.btn-login{width:100%;background:var(--yellow);border:none;border-radius:10px;padding:12px;color:#0a0c10;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.login-err{text-align:center;color:var(--red);font-size:13px;margin-top:10px;display:none}
+.login-hint{text-align:center;margin-top:16px;font-size:12px;color:var(--text3)}
+
+#app{display:none;min-height:100vh}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 22px;border-bottom:1px solid var(--border)}
+.sidebar-logo img{height:30px}
+.sidebar-logo p{font-size:10px;color:var(--text3);margin-top:6px;letter-spacing:1px;text-transform:uppercase}
+
+/* Light rejimdə `logo-light.png` artıq yazı daşıyır, ona görə mətni dubllamırıq */
+[data-theme="light"] .login-logo p,
+html.theme-light .login-logo p,
+[data-theme="light"] .sidebar-logo p,
+html.theme-light .sidebar-logo p{display:none}
+.nav-section{padding:12px 0 4px;font-size:10px;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;padding-left:22px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:9px 22px;color:var(--text3);cursor:pointer;transition:all .15s;font-size:13px;font-weight:500;border-left:2px solid transparent}
+.nav-item:hover{color:var(--text);background:var(--bg3)}
+.nav-item.active{color:var(--yellow);background:linear-gradient(90deg,rgba(245,197,24,.08),transparent);border-left-color:var(--yellow)}
+.nav-badge{margin-left:auto;background:var(--amber);color:#0a0c10;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;display:none}
+.sidebar-bottom{margin-top:auto;padding:16px 22px;border-top:1px solid var(--border)}
+.user-chip{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.avatar.admin{background:var(--yellow);color:#0a0c10}
+.avatar.worker{background:var(--bg4);color:var(--text2);border:1px solid var(--border2)}
+.user-info p{font-size:13px;font-weight:600}
+.user-info span{font-size:11px;color:var(--text3)}
+.conn-pill{font-size:10px;padding:4px 8px;border-radius:6px;margin-bottom:8px;display:block;text-align:center}
+.conn-pill.online{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.conn-pill.offline{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.conn-pill.local{background:var(--gray-bg);color:var(--text3);border:1px solid var(--border)}
+.logout-btn{background:none;border:1px solid var(--border);color:var(--text3);font-size:12px;cursor:pointer;padding:6px 12px;border-radius:8px;width:100%;font-family:inherit}
+.theme-btn{margin-bottom:8px;background:none;border:1px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer;padding:7px 10px;border-radius:8px;width:100%;font-family:inherit}
+.theme-btn:hover{background:var(--bg3);color:var(--text)}
+
+.main{margin-left:240px;padding:28px 32px;min-height:100vh}
+.page{display:none}.page.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-header h1{font-size:20px;font-weight:600;letter-spacing:-.4px}
+.page-header p{font-size:13px;color:var(--text3);margin-top:3px}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.total::before{background:var(--border2)}
+.stat-card.green::before{background:var(--green)}
+.stat-card.blue::before{background:var(--blue)}
+.stat-card.red::before{background:var(--red)}
+.stat-card.amber::before{background:var(--amber)}
+.stat-card .val{font-size:28px;font-weight:600;font-family:'TT Wellingtons','DM Mono',monospace}
+.stat-card.green .val{color:var(--green)}
+.stat-card.blue .val{color:var(--blue)}
+.stat-card.red .val{color:var(--red)}
+.stat-card.amber .val{color:var(--amber)}
+.stat-card .lbl{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);border-radius:9px;padding:8px 15px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn:hover{color:var(--text);background:var(--bg4)}
+.btn.yellow{background:var(--yellow);border-color:var(--yellow);color:#0a0c10;font-weight:600}
+.btn.danger{border-color:var(--red-border);color:var(--red)}
+.btn.success{border-color:var(--green-border);color:var(--green)}
+.btn.sm{padding:5px 10px;font-size:12px}
+.btn.xs{padding:3px 8px;font-size:11px}
+
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px}
+.table-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px}
+.table-toolbar h3{font-size:14px;font-weight:600}
+.table-scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:700px}
+thead tr{background:var(--bg3)}
+th,td{padding:11px 16px;text-align:left;font-size:13px;border-top:1px solid var(--border)}
+th{font-size:11px;color:var(--text3);text-transform:uppercase;font-weight:600}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+tbody tr.row-pending td{background:rgba(251,191,36,.04)}
+.mono{font-family:'TT Wellingtons','DM Mono',monospace;font-size:11px;color:var(--text3)}
+.tbl-actions{display:flex;gap:5px;flex-wrap:nowrap}
+
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%}
+.badge.green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}.badge.green::before{background:var(--green)}
+.badge.blue{background:var(--blue-bg);color:var(--blue);border:1px solid #0d2a52}.badge.blue::before{background:var(--blue)}
+.badge.amber{background:var(--amber-bg);color:var(--amber);border:1px solid #4a3608}.badge.amber::before{background:var(--amber)}
+.badge.red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}.badge.red::before{background:var(--red)}
+.badge.gray{background:var(--gray-bg);color:var(--text2);border:1px solid var(--border)}.badge.gray::before{background:var(--text3)}
+
+.sselect{background:transparent;border:none;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;padding:3px 6px;border-radius:6px}
+.sselect.green{color:var(--green);background:var(--green-bg)}
+.sselect.blue{color:var(--blue);background:var(--blue-bg)}
+.sselect.amber{color:var(--amber);background:var(--amber-bg)}
+.sselect.red{color:var(--red);background:var(--red-bg)}
+.sselect.gray{color:var(--text2);background:var(--gray-bg)}
+
+.countdown{font-family:'TT Wellingtons','DM Mono',monospace;font-size:11px;font-weight:600}
+.countdown-ok{color:var(--green)}
+.countdown-warn{color:var(--amber)}
+.countdown-late{color:var(--red)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px;backdrop-filter:blur(4px)}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;padding:28px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto}
+.modal h2{font-size:16px;font-weight:600;margin-bottom:20px}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.span2{grid-column:span 2}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:22px;padding-top:16px;border-top:1px solid var(--border)}
+
+.task-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:12px}
+.task-card.pending{border-color:rgba(251,191,36,.35);box-shadow:0 0 0 1px rgba(251,191,36,.1)}
+.task-card.done{opacity:.65}
+.task-card-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}
+.task-title{font-size:14px;font-weight:600}
+.task-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.meta-tag{font-size:12px;color:var(--text3);background:var(--bg3);padding:3px 9px;border-radius:6px}
+.task-note{font-size:12px;color:var(--text2);background:var(--bg3);padding:9px 13px;border-radius:9px;border-left:3px solid var(--yellow);margin-bottom:10px}
+.status-row{display:flex;align-items:stretch;gap:10px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border)}
+.status-row label{font-size:12px;color:var(--text3);align-self:center}
+.status-row select{background:var(--bg3);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;color:var(--text);font-size:12px;font-family:inherit;min-width:140px}
+.worker-actions{display:flex;flex-direction:column;gap:10px;width:100%}
+.worker-status-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;width:100%}
+.worker-status-row select{flex:1;min-width:0}
+.btn-approve{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:100%;min-height:52px;padding:14px 16px;background:linear-gradient(180deg,#1a3d24,#0d2818);border:1px solid var(--green-border);border-radius:12px;color:var(--green);cursor:pointer;font-family:inherit;transition:transform .1s,opacity .15s;-webkit-tap-highlight-color:transparent}
+.btn-approve:active{transform:scale(.98);opacity:.9}
+.btn-approve-label{font-size:16px;font-weight:700;letter-spacing:.3px}
+.btn-approve-hint{font-size:11px;color:var(--text3);font-weight:400}
+.pending-box{display:flex;align-items:center;gap:10px;width:100%;padding:14px 16px;background:var(--amber-bg);border:1px solid rgba(251,191,36,.25);border-radius:12px}
+.pending-box-icon{font-size:22px;flex-shrink:0}
+.pending-box-text{flex:1;min-width:0}
+.pending-box-title{font-size:14px;font-weight:700;color:var(--amber);display:block}
+.pending-box-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.done-box{width:100%;padding:12px 16px;background:var(--green-bg);border:1px solid var(--green-border);border-radius:12px;text-align:center;font-size:14px;font-weight:600;color:var(--green)}
+#app.app-worker .task-card-top{flex-direction:column;align-items:flex-start}
+#app.app-worker .task-card-top .badge{margin-top:6px}
+
+.users-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.user-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px}
+.user-card-top{display:flex;align-items:center;gap:13px;margin-bottom:16px}
+.user-card-name{font-size:14px;font-weight:600}
+.user-card-role{font-size:11px;color:var(--text3);text-transform:uppercase}
+.user-stats{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:14px}
+.mini-stat{flex:1;text-align:center}
+.mini-stat .n{font-size:18px;font-weight:600;font-family:'TT Wellingtons','DM Mono',monospace}
+.mini-stat .l{font-size:10px;color:var(--text3);text-transform:uppercase}
+.user-actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.approval-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px;background:var(--bg2);border:1px solid var(--border);border-radius:14px;margin-bottom:12px;flex-wrap:wrap}
+.approval-card h3{font-size:15px;margin:6px 0}
+.approval-meta{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text3);margin:8px 0}
+.approval-note{font-size:13px;color:var(--text2);margin-bottom:8px}
+
+.journal-entry{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:10px}
+.je-top{display:flex;justify-content:space-between;gap:12px;margin-bottom:8px}
+.je-title{font-size:14px;font-weight:600}
+.je-meta{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.je-note{font-size:13px;color:var(--text2);line-height:1.6}
+
+.settings-section{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:22px 24px;margin-bottom:16px}
+.settings-section h3{font-size:14px;font-weight:600;margin-bottom:16px}
+.setup-steps{counter-reset:step;padding-left:0;list-style:none}
+.setup-steps li{counter-increment:step;padding:10px 0 10px 36px;position:relative;font-size:13px;color:var(--text2);border-bottom:1px solid var(--border)}
+.setup-steps li::before{content:counter(step);position:absolute;left:0;width:24px;height:24px;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--yellow)}
+.setup-code{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;font-family:'TT Wellingtons','DM Mono',monospace;font-size:11px;color:var(--text2);overflow-x:auto;margin-top:12px;white-space:pre}
+
+.perf-panel{margin-bottom:24px}
+.perf-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.perf-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center}
+.perf-val{font-size:26px;font-weight:700;font-family:'TT Wellingtons','DM Mono',monospace}
+.perf-val.red{color:var(--red)}.perf-val.blue{color:var(--blue)}.perf-val.amber{color:var(--amber)}
+.perf-lbl{font-size:11px;color:var(--text3);margin-top:4px;text-transform:uppercase}
+.perf-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.perf-chart-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px}
+.perf-chart-box h4{font-size:13px;margin-bottom:14px;color:var(--text2)}
+.bar-row{display:grid;grid-template-columns:80px 1fr 40px;gap:10px;align-items:center;margin-bottom:10px;font-size:12px}
+.bar-track{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;background:var(--yellow);border-radius:4px}
+.bar-fill.green{background:var(--green)}
+.bar-num{text-align:right;color:var(--text3);font-family:'TT Wellingtons','DM Mono',monospace;font-size:11px}
+.muted{color:var(--text3);font-size:13px}
+
+.search-bar{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 14px;color:var(--text);font-size:13px;font-family:inherit;outline:none}
+.search-bar:focus{border-color:var(--yellow)}
+.prio{display:inline-flex;align-items:center;gap:5px;font-size:12px}
+.pd{width:6px;height:6px;border-radius:50%}
+.pd.k{background:var(--red)}.pd.y{background:var(--amber)}.pd.o{background:var(--blue)}
+.pass-row{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg3);border-radius:9px;border:1px solid var(--border);flex-wrap:wrap}
+.pass-inp{background:var(--bg);border:1px solid var(--border2);border-radius:7px;padding:6px 10px;color:var(--text);font-size:13px;font-family:inherit;width:140px}
+.empty{text-align:center;padding:50px 20px;color:var(--text3)}
+.empty .ico{font-size:36px;opacity:.3;margin-bottom:12px}
+.notif{position:fixed;top:20px;right:20px;padding:12px 18px;border-radius:11px;font-size:13px;font-weight:500;z-index:9999;animation:notifIn .3s ease;box-shadow:0 6px 24px rgba(0,0,0,.5)}
+.notif.ok{border:1px solid var(--green-border);color:var(--green);background:var(--bg2)}
+.notif.err{border:1px solid var(--red-border);color:var(--red);background:var(--bg2)}
+.notif.info{border:1px solid var(--border2);color:var(--text2);background:var(--bg2)}
+@keyframes notifIn{from{transform:translateX(110%);opacity:0}to{transform:none;opacity:1}}
+
+.mobile-toggle{display:none;position:fixed;top:12px;left:12px;z-index:200;background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-size:18px}
+
+@media(max-width:900px){
+  .mobile-toggle{display:block}
+  .sidebar{transform:translateX(-100%);transition:transform .25s;width:260px}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0;padding:16px;padding-top:56px}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .perf-grid{grid-template-columns:1fr 1fr}
+  .perf-charts{grid-template-columns:1fr}
+  .modal-grid{grid-template-columns:1fr}
+  .span2{grid-column:span 1}
+}
+@media(max-width:600px){
+  .stats-row,.perf-grid{grid-template-columns:1fr}
+  .stats-row-worker{grid-template-columns:1fr 1fr!important}
+  .login-box{padding:28px 20px;margin:14px}
+  .approval-card{flex-direction:column;align-items:flex-start}
+  .header-actions{width:100%}
+  .header-actions .btn,.header-actions .search-bar{flex:1;min-width:120px}
+  #app.app-worker .main{padding:12px;padding-top:56px}
+  #app.app-worker #page-my-tasks .page-header h1{font-size:18px}
+  #app.app-worker #page-my-tasks .page-header p{font-size:12px}
+  #app.app-worker .task-card{padding:14px 16px;border-radius:12px}
+  #app.app-worker .task-title{font-size:15px;line-height:1.35}
+  #app.app-worker .task-meta{gap:6px}
+  #app.app-worker .meta-tag{font-size:11px;padding:4px 8px}
+  #app.app-worker .worker-status-row{flex-direction:column;align-items:stretch}
+  #app.app-worker .worker-status-row label{display:none}
+  #app.app-worker .worker-status-row select{width:100%;padding:12px;font-size:14px;border-radius:10px}
+  #app.app-worker .btn-approve{min-height:56px;border-radius:14px}
+  #app.app-worker .btn-approve-label{font-size:17px}
+  .notif{left:12px;right:12px;top:auto;bottom:20px}
+}
+input,select,textarea{color-scheme:dark}
+[data-theme="light"] input,[data-theme="light"] select,[data-theme="light"] textarea,html.theme-light input,html.theme-light select,html.theme-light textarea{color-scheme:light}
+</style>
+</head>
+<body>
+
+<button class="mobile-toggle" id="menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')" aria-label="Menyu">☰</button>
+
+<div id="login-screen">
+  <div class="login-box">
+    <button type="button" class="login-theme-toggle" id="theme-toggle-login" onclick="toggleTheme()" aria-label="Mövzu dəyiş" title="Qara / Ağ rejim">
+      <span id="theme-toggle-login-icon">☀️</span>
+    </button>
+    <div class="login-logo">
+      <img id="login-logo-img" src="./logo.png" data-dark-src="./logo.png" data-light-src="./logo-light.png" alt="Alcopoint" onerror="this.style.display='none'">
+      <p>İş Planlaması Sistemi</p>
+    </div>
+    <div class="field">
+      <label>İstifadəçi</label>
+      <select id="login-user">
+        <option value="">— Seçin —</option>
+        <option value="admin">Admin (Rəhbər)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Şifrə</label>
+      <input type="password" id="login-pass" placeholder="Şifrənizi daxil edin">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Daxil ol</button>
+    <p class="login-err" id="login-err">İstifadəçi adı və ya şifrə yanlışdır</p>
+    <p class="login-hint">Təhlükəsizlik səbəbi ilə şifrələr göstərilmir</p>
+  </div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img id="sidebar-logo-img" src="./logo.png" data-dark-src="./logo.png" data-light-src="./logo-light.png" alt="Alcopoint" onerror="this.style.display='none'">
+      <p>İş Planlaması</p>
+    </div>
+
+    <div id="nav-admin" style="display:none">
+      <div class="nav-section">Əsas</div>
+      <div class="nav-item active" onclick="showPage('dashboard');document.querySelector('.sidebar').classList.remove('open')" data-page="dashboard"><span>◈</span> Dashboard</div>
+      <div class="nav-item" onclick="showPage('tasks');document.querySelector('.sidebar').classList.remove('open')" data-page="tasks"><span>☰</span> Tapşırıqlar</div>
+      <div class="nav-item" onclick="showPage('approval');document.querySelector('.sidebar').classList.remove('open')" data-page="approval">
+        <span>✓</span> Təsdiq Cədvəli <span class="nav-badge" id="nav-approval-badge">0</span>
+      </div>
+      <div class="nav-item" onclick="showPage('performance');document.querySelector('.sidebar').classList.remove('open')" data-page="performance"><span>📊</span> Performans</div>
+      <div class="nav-section">Şirkət</div>
+      <div class="nav-item" onclick="showPage('import');document.querySelector('.sidebar').classList.remove('open')" data-page="import"><span>📋</span> İdxal Jurnalı</div>
+      <div class="nav-item" onclick="showPage('users');document.querySelector('.sidebar').classList.remove('open')" data-page="users"><span>◉</span> İşçilər</div>
+      <div class="nav-section">Sistem</div>
+      <div class="nav-item" onclick="showPage('settings');document.querySelector('.sidebar').classList.remove('open')" data-page="settings"><span>⚙</span> Parametrlər</div>
+    </div>
+
+    <div id="nav-worker" style="display:none">
+      <div class="nav-section">Mənim</div>
+      <div class="nav-item active" onclick="showPage('my-tasks');document.querySelector('.sidebar').classList.remove('open')" data-page="my-tasks"><span>◈</span> Tapşırıqlarım</div>
+    </div>
+
+    <div class="sidebar-bottom">
+      <span class="conn-pill local" id="conn-status">◆ Local rejim</span>
+      <div class="user-chip">
+        <div class="avatar" id="sidebar-avatar">A</div>
+        <div class="user-info"><p id="sidebar-name">—</p><span id="sidebar-role">—</span></div>
+      </div>
+      <button class="theme-btn" id="theme-toggle-btn" onclick="toggleTheme()">🌙 Qara rejim</button>
+      <button class="logout-btn" onclick="doLogout()">⏻ Çıxış</button>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div><h1>Dashboard</h1><p id="dash-date"></p></div>
+        <div class="header-actions">
+          <button class="btn" onclick="exportAllTasksPdf()">⬇ PDF Export</button>
+          <button class="btn yellow" onclick="openTaskModal()">+ Yeni Tapşırıq</button>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card total"><div class="val" id="s-total">0</div><div class="lbl">Cəmi</div></div>
+        <div class="stat-card green"><div class="val" id="s-done">0</div><div class="lbl">Tam təsdiqlənmiş</div></div>
+        <div class="stat-card blue"><div class="val" id="s-prog">0</div><div class="lbl">Davam edir</div></div>
+        <div class="stat-card amber"><div class="val" id="s-pending">0</div><div class="lbl">Təsdiq gözləyir</div></div>
+        <div class="stat-card red"><div class="val" id="s-late">0</div><div class="lbl">Gecikir</div></div>
+      </div>
+      <div id="perf-panel" class="perf-panel"></div>
+      <div class="table-wrap">
+        <div class="table-toolbar"><h3>Son tapşırıqlar</h3><button class="btn sm" onclick="showPage('tasks')">Hamısı →</button></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Tapşırıq</th><th>İşçi</th><th>Geri sayım</th><th>Status</th><th>Prioritet</th></tr></thead>
+            <tbody id="dash-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <div><h1>Tapşırıqlar</h1><p>Təsdiq gözləyənlər ən üstdə</p></div>
+        <div class="header-actions">
+          <input class="search-bar" type="text" placeholder="Axtar..." id="task-search" oninput="renderTasksTable()" style="width:160px">
+          <select class="search-bar" id="filter-worker" onchange="renderTasksTable()" style="width:120px"><option value="">Bütün işçilər</option></select>
+          <select class="search-bar" id="filter-status" onchange="renderTasksTable()" style="width:150px">
+            <option value="">Bütün statuslar</option>
+            <option>Gözləyir</option><option>Davam edir</option>
+            <option>Rəhbər baxışı gözləyir</option><option>Tam təsdiqləndi</option><option>Gecikir</option>
+          </select>
+          <button class="btn" onclick="exportAllTasksPdf()">PDF</button>
+          <button class="btn yellow" onclick="openTaskModal()">+ Yeni</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-toolbar"><h3 id="tasks-count">Tapşırıqlar</h3></div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Tapşırıq</th><th>İşçi</th><th>Şöbə</th><th>Geri sayım</th><th>Status</th><th>Prioritet</th><th>Qeyd</th><th></th></tr></thead>
+            <tbody id="tasks-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="page" id="page-approval">
+      <div class="page-header">
+        <div><h1>Təsdiq Cədvəli</h1><p>Yalnız rəhbər baxışı gözləyən tapşırıqlar — <strong id="approval-count">0</strong> ədəd</p></div>
+      </div>
+      <div id="approval-list"></div>
+    </div>
+
+    <div class="page" id="page-performance">
+      <div class="page-header">
+        <div><h1>Günlük Performans</h1><p>Statistika və şöbə analizi</p></div>
+        <button class="btn" onclick="exportAllTasksPdf()">⬇ PDF Hesabat</button>
+      </div>
+      <div id="perf-panel-full" class="perf-panel"></div>
+    </div>
+
+    <div class="page" id="page-import">
+      <div class="page-header">
+        <div><h1>İdxal Jurnalı</h1><p>Günlük şirkətlərlə gedən işlər</p></div>
+        <button class="btn yellow" onclick="openImportModal()">+ Yeni Qeyd</button>
+      </div>
+      <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+        <input class="search-bar" type="text" id="imp-search" placeholder="Axtar..." oninput="renderImport()" style="width:200px">
+        <input class="search-bar" type="date" id="imp-date-filter" onchange="renderImport()">
+        <select class="search-bar" id="imp-status-filter" onchange="renderImport()" style="width:160px">
+          <option value="">Bütün statuslar</option>
+          <option>Gözləyir</option><option>Davam edir</option><option>Tamamlandı</option><option>Ləğv edildi</option>
+        </select>
+      </div>
+      <div id="import-list"></div>
+    </div>
+
+    <div class="page" id="page-users">
+      <div class="page-header">
+        <div><h1>İşçilər</h1><p>Komanda üzvlərini idarə edin</p></div>
+        <button class="btn yellow" onclick="openUserModal()">+ Yeni İşçi</button>
+      </div>
+      <div class="users-grid" id="users-grid"></div>
+    </div>
+
+    <div class="page" id="page-settings">
+      <div class="page-header"><div><h1>Parametrlər</h1><p>Sistem və Firebase tənzimləmələri</p></div></div>
+
+      <div class="settings-section">
+        <h3>🔥 Firebase Realtime Database</h3>
+        <p id="firebase-status-text" style="font-size:13px;color:var(--text2);margin-bottom:16px"></p>
+        <ol class="setup-steps">
+          <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase Console</a> açın və yeni layihə yaradın</li>
+          <li>Build → Realtime Database → Create Database (test rejimi və ya production)</li>
+          <li>Project Settings → Your apps → Web app əlavə edin</li>
+          <li><code>firebase-config.js</code> faylında <code>firebaseConfig</code> dəyərlərini doldurun</li>
+          <li>Database → Rules bölməsində aşağıdakı qaydaları tətbiq edin (demo üçün):</li>
+        </ol>
+        <pre class="setup-code">{
+  "rules": {
+    ".read": true,
+    ".write": true
+  }
+}</pre>
+        <p style="font-size:12px;color:var(--text3);margin-top:12px">⚠️ Production üçün auth və məhdud qaydalar tələb olunur. Struktur: <code>tasks/</code>, <code>users/</code>, <code>departments/</code>, <code>activityLogs/</code>, <code>meta/</code></p>
+        <ol class="setup-steps" style="margin-top:16px">
+          <li>GitHub-da repository yaradın və faylları yükləyin</li>
+          <li>Settings → Pages → Deploy from branch → <code>main</code> / root</li>
+          <li>Sayt: <code>https://istifadeci.github.io/repo-adı/</code></li>
+        </ol>
+      </div>
+
+      <div class="settings-section">
+        <h3>🏢 Şöbə əlavə et</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
+          <div class="field" style="margin:0;flex:1;min-width:260px">
+            <label>Yeni şöbə adı</label>
+            <input type="text" id="new-dept-name" placeholder="Məs: Marketinq">
+          </div>
+          <button class="btn yellow" onclick="addDepartment()">Əlavə et</button>
+        </div>
+        <p id="departments-list" style="font-size:12px;color:var(--text3);margin-top:12px"></p>
+      </div>
+
+      <div class="settings-section">
+        <h3>🔐 Admin şifrəsi</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:500px">
+          <div class="field"><label>Köhnə</label><input type="password" id="old-pass"></div>
+          <div class="field"><label>Yeni</label><input type="password" id="new-pass"></div>
+          <div class="field span2"><label>Təkrar</label><input type="password" id="new-pass2"></div>
+        </div>
+        <button class="btn yellow" style="margin-top:8px" onclick="changeAdminPass()">Şifrəni yenilə</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>👤 İşçi şifrələri</h3>
+        <div id="worker-pass-list"></div>
+      </div>
+
+      <div class="settings-section">
+        <h3>💾 Yedəkləmə</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" onclick="exportData()">⬇ JSON yüklə</button>
+          <label class="btn" style="cursor:pointer">⬆ JSON yüklə
+            <input type="file" accept=".json" style="display:none" onchange="importData(event)">
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>🗑 Sıfırlama</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn danger" onclick="clearTasks()">Tapşırıqları sil</button>
+          <button class="btn danger" onclick="clearImport()">Jurnalı sil</button>
+          <button class="btn danger" onclick="clearAll()">Hamısını sıfırla</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page page-worker" id="page-my-tasks">
+      <div class="page-header"><div><h1 id="my-tasks-title">Tapşırıqlarım</h1><p>İş bitdikdə <strong>Təsdiqləndi</strong> düyməsinə basın</p></div></div>
+      <div class="stats-row stats-row-worker">
+        <div class="stat-card total"><div class="val" id="my-s-total">0</div><div class="lbl">Cəmi</div></div>
+        <div class="stat-card green"><div class="val" id="my-s-done">0</div><div class="lbl">Təsdiqlənmiş</div></div>
+        <div class="stat-card blue"><div class="val" id="my-s-prog">0</div><div class="lbl">Davam edir</div></div>
+        <div class="stat-card red"><div class="val" id="my-s-late">0</div><div class="lbl">Gecikir</div></div>
+      </div>
+      <div id="my-tasks-list"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modals -->
+<div class="modal-overlay" id="task-modal" style="display:none" onclick="if(event.target===this)closeTaskModal()">
+  <div class="modal">
+    <h2 id="modal-task-title">Yeni Tapşırıq</h2>
+    <div class="modal-grid">
+      <div class="field span2"><label>Tapşırıq adı *</label><input type="text" id="f-task"></div>
+      <div class="field"><label>İşçi *</label><select id="f-worker"></select></div>
+      <div class="field"><label>Şöbə</label><select id="f-dept"></select></div>
+      <div class="field span2">
+        <label>Yeni şöbə (opsional)</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input type="text" id="f-new-dept" placeholder="Məs: Marketinq">
+          <button class="btn yellow sm" type="button" onclick="addDepartment(document.getElementById('f-new-dept')?.value)">Əlavə et</button>
+        </div>
+      </div>
+      <div class="field"><label>Başlama</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div class="date-group" style="flex:1;min-width:220px" title="Gün · Ay · İl">
+            <select id="f-start-d" aria-label="Gün"></select>
+            <select id="f-start-m" aria-label="Ay"></select>
+            <select id="f-start-y" aria-label="İl"></select>
+          </div>
+          <div style="min-width:120px;flex-shrink:0">
+            <select id="f-start-h" aria-label="Başlama saat"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Deadline</label>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div class="date-group" style="flex:1;min-width:220px" title="Gün · Ay · İl">
+            <select id="f-deadline-d" aria-label="Gün"></select>
+            <select id="f-deadline-m" aria-label="Ay"></select>
+            <select id="f-deadline-y" aria-label="İl"></select>
+          </div>
+          <div style="min-width:120px;flex-shrink:0">
+            <select id="f-deadline-h" aria-label="Deadline saat"></select>
+          </div>
+        </div>
+      </div>
+      <div class="field"><label>Prioritet</label><select id="f-priority"><option>Orta</option><option>Yüksək</option><option>Kritik</option></select></div>
+      <div class="field"><label>Status</label><select id="f-status">
+        <option>Gözləyir</option><option>Davam edir</option>
+        <option>Rəhbər baxışı gözləyir</option><option>Tam təsdiqləndi</option><option>Gecikir</option>
+      </select></div>
+      <div class="field span2"><label>Qeyd</label><input type="text" id="f-note"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeTaskModal()">Ləğv et</button>
+      <button class="btn yellow" onclick="saveTask()">Saxla</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="import-modal" style="display:none" onclick="if(event.target===this)closeImportModal()">
+  <div class="modal">
+    <h2 id="modal-import-title">Yeni İdxal Qeydi</h2>
+    <div class="modal-grid">
+      <div class="field span2"><label>Şirkət *</label><input type="text" id="imp-company"></div>
+      <div class="field span2"><label>Mövzu *</label><input type="text" id="imp-subject"></div>
+      <div class="field"><label>Tarix</label><input type="date" id="imp-date"></div>
+      <div class="field"><label>İşçi</label><select id="imp-worker"></select></div>
+      <div class="field"><label>Status</label><select id="imp-status"><option>Gözləyir</option><option>Davam edir</option><option>Tamamlandı</option><option>Ləğv edildi</option></select></div>
+      <div class="field"><label>Növbəti görüş</label><input type="date" id="imp-next"></div>
+      <div class="field span2"><label>Qeydlər</label><textarea id="imp-notes" rows="3"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeImportModal()">Ləğv et</button>
+      <button class="btn yellow" onclick="saveImport()">Saxla</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="user-modal" style="display:none" onclick="if(event.target===this)closeUserModal()">
+  <div class="modal">
+    <h2 id="user-modal-title">Yeni İşçi</h2>
+    <div class="field"><label>Ad Soyad *</label><input type="text" id="u-name"></div>
+    <div class="field"><label>Şöbə</label><select id="u-dept"><option>Satış</option><option>İT</option><option>Anbar</option><option>Logistika</option><option>Maliyyə</option><option>HR</option></select></div>
+    <div class="field"><label>Şifrə</label><input type="text" id="u-pass" value="isci2025"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeUserModal()">Ləğv et</button>
+      <button class="btn yellow" id="user-save-btn" onclick="saveUser()">Əlavə et</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="firebase-config.js"></script>
+<script src="js/firebase-service.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
