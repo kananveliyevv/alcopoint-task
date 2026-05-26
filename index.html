@@ -444,30 +444,40 @@ input,select,textarea{color-scheme:dark}
     </div>
 
     <div class="page" id="page-settings">
-      <div class="page-header"><div><h1>Parametrlər</h1><p>Sistem və Firebase tənzimləmələri</p></div></div>
+      <div class="page-header"><div><h1>Parametrlər</h1><p>Sistem və Supabase tənzimləmələri</p></div></div>
 
       <div class="settings-section">
-        <h3>🔥 Firebase Realtime Database</h3>
+        <h3>☁ Supabase Database</h3>
         <p id="firebase-status-text" style="font-size:13px;color:var(--text2);margin-bottom:16px"></p>
+        <p id="supabase-setup-hint" style="display:none;font-size:13px;color:var(--amber);margin-bottom:12px"></p>
         <ol class="setup-steps">
-          <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">Firebase Console</a> açın və yeni layihə yaradın</li>
-          <li>Build → Realtime Database → Create Database (test rejimi və ya production)</li>
-          <li>Project Settings → Your apps → Web app əlavə edin</li>
-          <li><code>firebase-config.js</code> faylında <code>firebaseConfig</code> dəyərlərini doldurun</li>
-          <li>Database → Rules bölməsində aşağıdakı qaydaları tətbiq edin (demo üçün):</li>
+          <li><a href="https://supabase.com/dashboard" target="_blank" rel="noopener">Supabase Dashboard</a> → layihəniz → <strong>SQL Editor</strong></li>
+          <li>Aşağıdakı SQL-i yapışdırıb <strong>Run</strong> edin (bir dəfə kifayətdir)</li>
+          <li>Səhifəni yeniləyin — status <strong>Supabase bağlı</strong> olacaq</li>
         </ol>
-        <pre class="setup-code">{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}</pre>
-        <p style="font-size:12px;color:var(--text3);margin-top:12px">⚠️ Production üçün auth və məhdud qaydalar tələb olunur. Struktur: <code>tasks/</code>, <code>users/</code>, <code>departments/</code>, <code>activityLogs/</code>, <code>meta/</code></p>
-        <ol class="setup-steps" style="margin-top:16px">
-          <li>GitHub-da repository yaradın və faylları yükləyin</li>
-          <li>Settings → Pages → Deploy from branch → <code>main</code> / root</li>
-          <li>Sayt: <code>https://istifadeci.github.io/repo-adı/</code></li>
-        </ol>
+        <pre class="setup-code" id="supabase-sql-block">create table if not exists public.alcopoint_db (
+  id integer primary key,
+  data jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.alcopoint_db enable row level security;
+
+drop policy if exists "alcopoint read" on public.alcopoint_db;
+drop policy if exists "alcopoint insert" on public.alcopoint_db;
+drop policy if exists "alcopoint update" on public.alcopoint_db;
+
+create policy "alcopoint read" on public.alcopoint_db for select to anon using (true);
+create policy "alcopoint insert" on public.alcopoint_db for insert to anon with check (true);
+create policy "alcopoint update" on public.alcopoint_db for update to anon using (true) with check (true);
+
+insert into public.alcopoint_db (id, data) values (1, '{}'::jsonb)
+on conflict (id) do nothing;
+
+-- Vacib: policy var, amma GRANT yoxdursa yazma bloklana bilər.
+grant select, insert, update on public.alcopoint_db to anon;
+grant select, insert, update on public.alcopoint_db to authenticated;</pre>
+        <button class="btn sm" style="margin-top:12px" type="button" onclick="retrySupabaseConnection()">Yenidən yoxla</button>
       </div>
 
       <div class="settings-section">
@@ -494,6 +504,7 @@ input,select,textarea{color-scheme:dark}
 
       <div class="settings-section">
         <h3>👤 İşçi şifrələri</h3>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Bu bölmə yalnız rəhbər üçündür. İşçi öz şifrəsini “Tapşırıqlarım” səhifəsindən dəyişə bilər.</p>
         <div id="worker-pass-list"></div>
       </div>
 

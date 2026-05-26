@@ -1,13 +1,13 @@
 (function () {
   "use strict";
 
-  // app.js eski isim olarak FirebaseService bekliyor.
-  // Bu dosya, aynı arayüzü Supabase ile karşılar.
-
-  const DEFAULT_REMOTE_TABLES = ["alcopoint_db", "alco_db", "meta"];
   const REMOTE_ROW_ID = 1;
-
   const LS_CACHE_KEY = "alcopoint_supabase_cache_v1";
+  const RETRY_MS = 4000;
+
+  function tableName() {
+    return globalThis.SUPABASE_TABLE || "alcopoint_db";
+  }
 
   function safeJsonParse(s) {
     try {
@@ -17,48 +17,14 @@
     }
   }
 
-  async function upsertDb(remoteTable, db) {
-    // DB'yi tek json blob olarak saklıyoruz.
-    // Kolon adı farklı olabileceği için (data / value) sırayla deneriz.
-    const fields = ["data", "value"];
-    let lastErr = null;
-    for (const field of fields) {
-      const payload = { id: REMOTE_ROW_ID };
-      payload[field] = db;
-      try {
-        const { error } = await globalThis.supabaseClient
-          .from(remoteTable)
-          .upsert(payload, { onConflict: "id" });
-        if (!error) return;
-        lastErr = error;
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error("Unable to upsert JSON column");
+  function isMissingTable(err) {
+    const msg = (err && (err.message || err.msg || String(err))) || "";
+    return err?.code === "PGRST205" || /Could not find the table/i.test(msg);
   }
 
-  async function fetchDb(remoteTable) {
-    const fields = ["data", "value"];
-    let lastErr = null;
-    for (const field of fields) {
-      try {
-        const { data, error } = await globalThis.supabaseClient
-          .from(remoteTable)
-          .select(`id,${field},updated_at`)
-          .eq("id", REMOTE_ROW_ID)
-          .maybeSingle();
-        if (error) {
-          lastErr = error;
-          continue;
-        }
-        if (!data) return null;
-        return { id: data.id, data: data[field], updated_at: data.updated_at };
-      } catch (e) {
-        lastErr = e;
-      }
-    }
-    throw lastErr || new Error("Unable to fetch JSON column");
+  function errMessage(err) {
+    if (!err) return "Naməlum xəta";
+    return err.message || err.msg || String(err);
   }
 
   function writeCache(db, updatedAt) {
@@ -84,137 +50,193 @@
     return { mode, connected: !!connected, error: error ? String(error) : null };
   }
 
+  async function fetchRow() {
+    // JSON blob sütunu bəzən `data`, bəzən `value` adlanır.
+    // Birinci `data` ilə cəhd edirik, alınmasa `value`-a düşürük.
+    const tbl = tableName();
+
+    const tryField = async (field) => {
+      const { data, error } = await globalThis.supabaseClient
+        .from(tbl)
+        .select(`id,${field},updated_at`)
+        .eq("id", REMOTE_ROW_ID)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) return null;
+      return { id: data.id, data: data[field], updated_at: data.updated_at };
+    };
+
+    try {
+      const row = await tryField("data");
+      if (row) FirebaseService._jsonField = "data";
+      return row;
+    } catch (_) {
+      const row = await tryField("value");
+      if (row) FirebaseService._jsonField = "value";
+      return row;
+    }
+  }
+
+  async function upsertRow(db) {
+    const tbl = tableName();
+    const field = FirebaseService._jsonField || "data";
+    const payload = { id: REMOTE_ROW_ID };
+    payload[field] = db;
+
+    const { error } = await globalThis.supabaseClient
+      .from(tbl)
+      .upsert(payload, { onConflict: "id" });
+    if (error) throw error;
+  }
+
   const FirebaseService = {
     connected: false,
     initDone: false,
-    _mode: "local",
+    lastError: null,
+    needsSetup: false,
     _remoteTable: null,
     _lastRemoteUpdatedAt: readCacheUpdatedAt(),
     _pollTimer: null,
     _everConnected: false,
     _onStatus: null,
+    _onRemote: null,
+    _connecting: false,
+    _jsonField: "data",
 
     isConfigured() {
-      return (
-        typeof globalThis.supabaseClient !== "undefined" && !!globalThis.supabaseClient
-      );
+      return !!globalThis.supabaseClient;
+    },
+
+    getLastError() {
+      return FirebaseService.lastError;
     },
 
     loadCache() {
       return readCache();
     },
 
+    stopPolling() {
+      if (FirebaseService._pollTimer) {
+        clearInterval(FirebaseService._pollTimer);
+        FirebaseService._pollTimer = null;
+      }
+    },
+
+    startPolling() {
+      FirebaseService.stopPolling();
+      FirebaseService._pollTimer = setInterval(() => {
+        FirebaseService._tryConnect();
+      }, RETRY_MS);
+    },
+
+    _emitStatus(patch) {
+      const mode = patch.mode ?? (FirebaseService.connected ? "firebase" : "local");
+      const connected = patch.connected ?? FirebaseService.connected;
+      const error = patch.error !== undefined ? patch.error : FirebaseService.lastError;
+      if (FirebaseService._onStatus) {
+        FirebaseService._onStatus(buildStatus({ mode, connected, error }));
+      }
+    },
+
     async saveAll(db) {
-      if (!FirebaseService.connected || !FirebaseService._remoteTable) return;
-      // app.js await etmediği için exception yakalayalım.
+      if (!FirebaseService.connected) return;
       try {
-        const prevUpdatedAt = FirebaseService._lastRemoteUpdatedAt;
-        await upsertDb(FirebaseService._remoteTable, db);
-        // updated_at kesin dönmeyebilir; poll bir sonraki fetch’ta günceller.
-        // Cache’i hemen güncelleyerek UI'nin boşa beklememesini sağlarız.
-        writeCache(db, prevUpdatedAt);
+        await upsertRow(db);
+        writeCache(db, FirebaseService._lastRemoteUpdatedAt);
       } catch (e) {
-        console.warn("Supabase saveAll error:", e);
+        console.warn("Supabase saveAll:", e);
         FirebaseService.connected = false;
-        if (FirebaseService._onStatus && FirebaseService._everConnected) {
-          FirebaseService._onStatus(
-            buildStatus({ mode: "local", connected: false, error: "Supabase bağlantısı kəsildi" })
-          );
-        }
+        FirebaseService.lastError = errMessage(e);
+        FirebaseService._emitStatus({
+          mode: "local",
+          connected: false,
+          error: FirebaseService._everConnected ? FirebaseService.lastError : null
+        });
+        FirebaseService.startPolling();
       }
     },
 
     async pushActivity(entry) {
-      if (!FirebaseService.connected || !FirebaseService._remoteTable) return;
+      if (!FirebaseService.connected) return;
       try {
-        // activityLogs'u db blob içinde sakladığımız için tamamını yeniden kaydederiz.
-        // Kritik: entry formatı app.js'in beklentisiyle aynı olmalı.
-        const remote = await fetchDb(FirebaseService._remoteTable);
-        if (!remote || !remote.data) return;
-        const db = remote.data;
-        db.activityLogs = db.activityLogs || [];
-        db.activityLogs.unshift(entry);
-        if (db.activityLogs.length > 200) db.activityLogs.length = 200;
-        await upsertDb(FirebaseService._remoteTable, db);
-        writeCache(db, remote.updated_at || null);
+        const remote = await fetchRow();
+        const base = (remote && remote.data) || readCache() || {};
+        base.activityLogs = base.activityLogs || [];
+        base.activityLogs.unshift(entry);
+        if (base.activityLogs.length > 200) base.activityLogs.length = 200;
+        await upsertRow(base);
+        writeCache(base, remote?.updated_at || null);
       } catch (e) {
-        console.warn("Supabase pushActivity error:", e);
-        FirebaseService.connected = false;
-        if (FirebaseService._onStatus && FirebaseService._everConnected) {
-          FirebaseService._onStatus(
-            buildStatus({ mode: "local", connected: false, error: "Supabase bağlantısı kəsildi" })
-          );
+        console.warn("Supabase pushActivity:", e);
+      }
+    },
+
+    async _tryConnect() {
+      if (FirebaseService._connecting || !FirebaseService.isConfigured()) return;
+      FirebaseService._connecting = true;
+
+      try {
+        const remote = await fetchRow();
+        FirebaseService._remoteTable = tableName();
+        FirebaseService.needsSetup = false;
+        FirebaseService.lastError = null;
+        FirebaseService.connected = true;
+        FirebaseService._everConnected = true;
+        FirebaseService.initDone = true;
+        FirebaseService.stopPolling();
+
+        if (remote && remote.data && typeof remote.data === "object") {
+          FirebaseService._lastRemoteUpdatedAt = remote.updated_at || null;
+          writeCache(remote.data, remote.updated_at || null);
+          if (FirebaseService._onRemote) FirebaseService._onRemote(remote.data);
+        } else {
+          const cached = readCache();
+          if (cached) {
+            await upsertRow(cached);
+          } else {
+            await upsertRow({});
+          }
         }
+
+        FirebaseService._emitStatus({ mode: "firebase", connected: true, error: null });
+      } catch (e) {
+        FirebaseService.connected = false;
+        if (isMissingTable(e)) {
+          FirebaseService.needsSetup = true;
+          FirebaseService.lastError =
+            "Cədvəl '" +
+            tableName() +
+            "' yoxdur. Supabase SQL Editor-də SUPABASE_SETUP.txt faylındakı SQL-i işlədin.";
+        } else {
+          FirebaseService.needsSetup = false;
+          FirebaseService.lastError = errMessage(e);
+        }
+        FirebaseService._emitStatus({
+          mode: "local",
+          connected: false,
+          error: FirebaseService._everConnected ? FirebaseService.lastError : null
+        });
+      } finally {
+        FirebaseService._connecting = false;
       }
     },
 
     init(onRemote, onStatus) {
+      FirebaseService._onRemote = onRemote || null;
       FirebaseService._onStatus = onStatus || null;
-      const status = (s) => {
-        try {
-          FirebaseService._onStatus && FirebaseService._onStatus(s);
-        } catch (_) {}
-      };
 
       if (!FirebaseService.isConfigured()) {
-        // İlk açılışta “bağlantı kəsildi” gibi görünmesin: sessiz local.
-        status(buildStatus({ mode: "local", connected: false, error: null }));
+        FirebaseService.lastError = "Supabase kitabxanası və ya config yüklənməyib";
+        FirebaseService._emitStatus({ mode: "local", connected: false, error: null });
         return false;
       }
 
-      // Başlangıçta local görünsün; bağlantı kurulunca "firebase" moduna geçer.
-      status(buildStatus({ mode: "local", connected: false, error: null }));
-
-      const run = async () => {
-        // Uygun tabloyu bulmak için sırayla deneriz.
-        let lastErr = null;
-        for (const table of DEFAULT_REMOTE_TABLES) {
-          try {
-            const remote = await fetchDb(table);
-            FirebaseService._remoteTable = table;
-
-            // Tablo boş ise, default db'yi ilk kez yazmaya çalışacağız.
-            if (!remote || !remote.data) {
-              // onRemote callback'e gönderecek bir şey yoksa db'yi app.js kendi defaultundan alıyor.
-              // Bu nedenle sadece connected=true yapıp, sonraki saveAll poll ile tabloya yazacağız.
-              FirebaseService.connected = true;
-              FirebaseService._everConnected = true;
-              FirebaseService._lastRemoteUpdatedAt = null;
-              status(buildStatus({ mode: "firebase", connected: true, error: null }));
-              FirebaseService.initDone = true;
-              // Cache'i boş geçiyoruz; app loadDB zaten local cache'i kullanır.
-              return;
-            }
-
-            // Remote'dan cache oluştur.
-            writeCache(remote.data, remote.updated_at || null);
-            FirebaseService._lastRemoteUpdatedAt = remote.updated_at || null;
-            FirebaseService.connected = true;
-            FirebaseService._everConnected = true;
-            status(buildStatus({ mode: "firebase", connected: true, error: null }));
-
-            // Remote snapshot'ı app'e ver.
-            onRemote && onRemote(remote.data);
-            FirebaseService.initDone = true;
-            return;
-          } catch (e) {
-            lastErr = e;
-          }
-        }
-
-        FirebaseService.connected = false;
-        // İlk bağlanma başarısızsa “connection lost” uyarısı spam olmasın.
-        status(buildStatus({ mode: "local", connected: false, error: FirebaseService._everConnected ? (lastErr ? (lastErr.message || String(lastErr)) : "Supabase error") : null }));
-      };
-
-      // init async ama app.js bunu await etmiyor.
-      run();
-
-      // "local" mı yoksa "firebase" mı olacağı status callback ile güncellenecek.
+      FirebaseService._emitStatus({ mode: "local", connected: false, error: null });
+      FirebaseService._tryConnect();
+      FirebaseService.startPolling();
       return true;
-    },
+    }
   };
 
   globalThis.FirebaseService = FirebaseService;
 })();
-

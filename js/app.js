@@ -586,10 +586,13 @@
     if (!el) return;
     if (firebaseMode === "firebase" && firebaseConnected) {
       el.className = "conn-pill online";
-      el.textContent = "● Realtime bağlı";
-    } else if (firebaseMode === "firebase") {
+      el.textContent = "● Data baza aktivdir";
+    } else if (FirebaseService.needsSetup) {
       el.className = "conn-pill offline";
-      el.textContent = "○ Yenidən qoşulur...";
+      el.textContent = "○ Supabase cədvəli yoxdur";
+    } else if (FirebaseService.isConfigured()) {
+      el.className = "conn-pill offline";
+      el.textContent = "○ Supabase qoşulur...";
     } else {
       el.className = "conn-pill local";
       el.textContent = "◆ Local rejim";
@@ -1063,14 +1066,30 @@
     document.getElementById("my-s-late").textContent = my.filter((t) => t.status === STATUS.LATE).length;
 
     const el = document.getElementById("my-tasks-list");
+    const passBox = `
+      <div class="settings-section" style="margin-bottom:16px">
+        <h3>🔐 Şifrəni dəyiş</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px">
+          <div class="field"><label>Köhnə</label><input type="password" id="my-old-pass"></div>
+          <div class="field"><label>Yeni</label><input type="password" id="my-new-pass"></div>
+          <div class="field" style="grid-column:span 2"><label>Təkrar</label><input type="password" id="my-new-pass2"></div>
+        </div>
+        <button class="btn yellow" style="margin-top:8px" type="button" onclick="changeMyPass()">Yadda saxla</button>
+      </div>
+    `;
+
     if (!my.length) {
-      el.innerHTML = '<div class="empty"><div class="ico">✓</div><p>Hal-hazırda tapşırığınız yoxdur</p></div>';
+      el.innerHTML =
+        passBox +
+        '<div class="empty"><div class="ico">✓</div><p>Hal-hazırda tapşırığınız yoxdur</p></div>';
       return;
     }
 
     const workerStatuses = [STATUS.WAIT, STATUS.PROGRESS, STATUS.LATE];
 
-    el.innerHTML = my
+    el.innerHTML =
+      passBox +
+      my
       .map((t) => {
         const done = isDoneStatus(t.status);
         const pending = t.waitingManager || t.status === STATUS.PENDING_MANAGER;
@@ -1120,6 +1139,42 @@
       })
       .join("");
   }
+
+  window.changeMyPass = function () {
+    if (!currentUser || currentUser.role === "admin") {
+      notify("Yalnız işçi üçün", "err");
+      return;
+    }
+    const o = document.getElementById("my-old-pass")?.value || "";
+    const n = document.getElementById("my-new-pass")?.value || "";
+    const n2 = document.getElementById("my-new-pass2")?.value || "";
+
+    const user = db.users.find((u) => u.id === currentUser.id);
+    if (!user) {
+      notify("İşçi tapılmadı", "err");
+      return;
+    }
+    if (o !== user.pass) {
+      notify("Köhnə şifrə yanlışdır", "err");
+      return;
+    }
+    if (!n || n.length < 3) {
+      notify("Yeni şifrə çox qısadır", "err");
+      return;
+    }
+    if (n !== n2) {
+      notify("Şifrələr uyğun gəlmir", "err");
+      return;
+    }
+    user.pass = n;
+    saveDB();
+    try {
+      document.getElementById("my-old-pass").value = "";
+      document.getElementById("my-new-pass").value = "";
+      document.getElementById("my-new-pass2").value = "";
+    } catch (_) {}
+    notify("Şifrə yeniləndi ✓");
+  };
 
   window.workerChgStatus = function (id, val) {
     const t = db.tasks.find((x) => x.id === id);
@@ -1389,13 +1444,50 @@
 
     const fbStatus = document.getElementById("firebase-status-text");
     if (fbStatus) {
-      fbStatus.textContent = FirebaseService.isConfigured()
-        ? firebaseConnected
-          ? "Firebase Realtime Database — aktiv və bağlı"
-          : "Firebase konfiqurasiya edilib — bağlantı gözlənilir"
-        : "Firebase konfiqurasiya edilməyib — local rejim aktivdir";
+      if (!FirebaseService.isConfigured()) {
+        fbStatus.textContent = "Supabase konfiqurasiya edilməyib — local rejim";
+      } else if (firebaseConnected) {
+        fbStatus.textContent = "Data baza aktivdir ✓";
+      } else if (FirebaseService.needsSetup) {
+        fbStatus.textContent =
+          "Supabase cədvəli tapılmadı. Aşağıdakı SQL-i Supabase SQL Editor-də işlədin.";
+      } else {
+        fbStatus.textContent =
+          FirebaseService.getLastError() || "Supabase qoşulması gözlənilir...";
+      }
+    }
+    const setupHint = document.getElementById("supabase-setup-hint");
+    if (setupHint) {
+      if (FirebaseService.needsSetup) {
+        setupHint.style.display = "block";
+        setupHint.textContent =
+          "⚠ Local rejim görünür, çünki Supabase-də hələ cədvəl yoxdur. SQL-i işlədib «Yenidən yoxla» basın.";
+      } else {
+        setupHint.style.display = "none";
+        setupHint.textContent = "";
+      }
     }
   }
+
+  window.retrySupabaseConnection = function () {
+    if (!FirebaseService.isConfigured()) {
+      notify("Supabase config tapılmadı", "err");
+      return;
+    }
+    notify("Supabase yoxlanılır...", "info");
+    FirebaseService._tryConnect().then(() => {
+      updateConnectionUI();
+      renderSettings();
+      if (FirebaseService.connected) {
+        FirebaseService.saveAll(db);
+        notify("Supabase bağlandı ✓", "ok");
+      } else if (FirebaseService.needsSetup) {
+        notify("Cədvəl hələ yoxdur — SQL-i işlədin", "err");
+      } else {
+        notify(FirebaseService.getLastError() || "Qoşulmadı", "err");
+      }
+    });
+  };
 
   window.changeAdminPass = function () {
     const o = document.getElementById("old-pass").value;
@@ -1791,11 +1883,20 @@
   const fbOk = FirebaseService.init(
     (remote) => mergeRemoteData(remote),
     (st) => {
+      const wasConnected = firebaseConnected;
       firebaseMode = st.mode;
       firebaseConnected = !!st.connected;
       updateConnectionUI();
-      if (st.connected) notify("Firebase realtime bağlandı", "info");
-      if (st.error && !st.connected) notify("Bağlantı kəsildi — cache istifadə olunur", "err");
+      if (st.connected && !wasConnected) {
+        notify("Data baza aktivdir ✓", "info");
+        FirebaseService.saveAll(db);
+      }
+      if (st.error && wasConnected && !st.connected) {
+        notify(
+          "Data baza yazı xətası — " + (st.error || "məlum deyil") + " (cache istifadə olunur)",
+          "err"
+        );
+      }
     }
   );
 

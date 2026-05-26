@@ -1,67 +1,40 @@
-Supabase kurulumu (bu projedeki sync katmanı için)
+ALCOPOINT — Supabase qoşulması (1 dəfə)
+=========================================
 
-Bu uygulama Supabase’te tek bir satırda tüm uygulama verisini `jsonb` olarak saklar.
-Kod varsayılan olarak `public.alcopoint_db` tablosunu dener:
-- `id` (integer, primary key)
-- `data` (jsonb)  // bazen şema `value` kullanıyorsa yine çalışır
-- `updated_at` (timestamptz)
+"Local rejim" görünürsə, Supabase layihənizdə cədvəl hələ yaradılmayıb.
+Aşağıdakı addımları edin:
 
-1) Tablo oluşturma
-```sql
+1) https://supabase.com/dashboard → layihə: eferozgkqhhkdgekqlhh
+2) Sol menyudan SQL Editor → New query
+3) Aşağıdakı SQL-i yapışdırın və RUN edin
+4) Saytda Parametrlər → "Yenidən yoxla" və ya səhifəni yeniləyin
+5) Status: "● Supabase bağlı" olmalıdır
+
+--- SQL (kopyalayın) ---
+
 create table if not exists public.alcopoint_db (
   id integer primary key,
-  data jsonb not null,
+  data jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now()
 );
 
--- JSON blob'u güncelleme trigger'i
-create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
-
-drop trigger if exists set_updated_at_trigger on public.alcopoint_db;
-create trigger set_updated_at_trigger
-before update on public.alcopoint_db
-for each row execute function public.set_updated_at();
-```
-
-2) RLS (Row Level Security) ve policy'ler
-```sql
 alter table public.alcopoint_db enable row level security;
 
--- anon (publishable/anon key) ile okuma
-create policy "alcopoint_db anon read"
-on public.alcopoint_db
-for select to anon
-using (true);
+drop policy if exists "alcopoint read" on public.alcopoint_db;
+drop policy if exists "alcopoint insert" on public.alcopoint_db;
+drop policy if exists "alcopoint update" on public.alcopoint_db;
 
--- anon ile insert
-create policy "alcopoint_db anon insert"
-on public.alcopoint_db
-for insert to anon
-with check (true);
+create policy "alcopoint read" on public.alcopoint_db for select to anon using (true);
+create policy "alcopoint insert" on public.alcopoint_db for insert to anon with check (true);
+create policy "alcopoint update" on public.alcopoint_db for update to anon using (true) with check (true);
 
--- anon ile update
-create policy "alcopoint_db anon update"
-on public.alcopoint_db
-for update to anon
-using (true)
-with check (true);
-```
+insert into public.alcopoint_db (id, data) values (1, '{}'::jsonb)
+on conflict (id) do nothing;
 
-3) İlk satırı ekleme
-```sql
-insert into public.alcopoint_db (id, data)
-values (1, '{}'::jsonb)
-on conflict (id) do update
-set data = public.alcopoint_db.data;
-```
+-- Vacib: policy var, amma GRANT yoxdursa yazma bloklana bilər.
+grant select, insert, update on public.alcopoint_db to anon;
+grant select, insert, update on public.alcopoint_db to authenticated;
 
-Notlar
-- Eğer sizde sütun adı `value` ise sorun değil; sync katmanı `data` yoksa `value` ile de dener.
-- Eğer farklı tablo adı kullanıyorsanız `js/firebase-service.js` içinde `DEFAULT_REMOTE_TABLES` listesini güncelleyin.
+--- SQL sonu ---
 
+Qeyd: Bütün məlumatlar `alcopoint_db` cədvəlində `data` sütununda JSON olaraq saxlanılır.
