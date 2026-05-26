@@ -1,0 +1,67 @@
+Supabase kurulumu (bu projedeki sync katmanı için)
+
+Bu uygulama Supabase’te tek bir satırda tüm uygulama verisini `jsonb` olarak saklar.
+Kod varsayılan olarak `public.alcopoint_db` tablosunu dener:
+- `id` (integer, primary key)
+- `data` (jsonb)  // bazen şema `value` kullanıyorsa yine çalışır
+- `updated_at` (timestamptz)
+
+1) Tablo oluşturma
+```sql
+create table if not exists public.alcopoint_db (
+  id integer primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+-- JSON blob'u güncelleme trigger'i
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists set_updated_at_trigger on public.alcopoint_db;
+create trigger set_updated_at_trigger
+before update on public.alcopoint_db
+for each row execute function public.set_updated_at();
+```
+
+2) RLS (Row Level Security) ve policy'ler
+```sql
+alter table public.alcopoint_db enable row level security;
+
+-- anon (publishable/anon key) ile okuma
+create policy "alcopoint_db anon read"
+on public.alcopoint_db
+for select to anon
+using (true);
+
+-- anon ile insert
+create policy "alcopoint_db anon insert"
+on public.alcopoint_db
+for insert to anon
+with check (true);
+
+-- anon ile update
+create policy "alcopoint_db anon update"
+on public.alcopoint_db
+for update to anon
+using (true)
+with check (true);
+```
+
+3) İlk satırı ekleme
+```sql
+insert into public.alcopoint_db (id, data)
+values (1, '{}'::jsonb)
+on conflict (id) do update
+set data = public.alcopoint_db.data;
+```
+
+Notlar
+- Eğer sizde sütun adı `value` ise sorun değil; sync katmanı `data` yoksa `value` ile de dener.
+- Eğer farklı tablo adı kullanıyorsanız `js/firebase-service.js` içinde `DEFAULT_REMOTE_TABLES` listesini güncelleyin.
+
