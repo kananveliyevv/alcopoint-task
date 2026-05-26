@@ -249,16 +249,16 @@
     const [datePart, timePart] = String(d).split("T");
     const p = datePart.split("-");
     if (p.length !== 3) return d;
-    const day = parseInt(p[2], 10);
-    const month = parseInt(p[1], 10);
+    const day = String(parseInt(p[2], 10)).padStart(2, "0");
+    const month = String(parseInt(p[1], 10)).padStart(2, "0");
     const year = p[0];
-    if (isNaN(day) || isNaN(month) || month < 1 || month > 12) return d;
-    const base = `${day} ${AZ_MONTHS[month - 1]} ${year}`;
+    if (isNaN(parseInt(day)) || isNaN(parseInt(month))) return d;
+    const base = `${day}.${month}.${year}`;
     if (!timePart) return base;
     const [hh, mm] = timePart.split(":");
     const h = String(parseInt(hh, 10)).padStart(2, "0");
     const m = String(parseInt(mm || "0", 10)).padStart(2, "0");
-    return `${base} · SAAT ${h}:${m}`;
+    return `${base} · ${h}:${m}`;
   }
 
   function initDateSelects(prefix) {
@@ -967,13 +967,20 @@
   window.managerApproveTask = function (taskId) {
     const task = db.tasks.find((t) => t.id === taskId);
     if (!task) return;
-    task.waitingManager = false;
-    task.managerApproved = true;
-    task.status = STATUS.FULLY_APPROVED;
-    task.managerApprovedAt = new Date().toISOString();
-    logActivity("manager_approve", task.id + " — " + task.task);
-    saveDB();
-    notify("Tapşırıq tam təsdiqləndi ✓");
+    openDeadlineModal({
+      title: task.task,
+      currentDeadline: task.deadline,
+      onConfirm: function(newDeadline) {
+        task.waitingManager = false;
+        task.managerApproved = true;
+        task.status = STATUS.FULLY_APPROVED;
+        task.managerApprovedAt = new Date().toISOString();
+        if (newDeadline) task.deadline = newDeadline;
+        logActivity("manager_approve", task.id + " — " + task.task);
+        saveDB();
+        notify("Tapşırıq tam təsdiqləndi ✓");
+      }
+    });
   };
 
   // ─── Task modal ───
@@ -1208,13 +1215,20 @@
   };
 
   window.managerApproveImport = function (id) {
-    const i = db.imports.find((x) => x.id === id);
-    if (!i) return;
-    i.status = "Tamamlandı";
-    i.managerApprovedAt = new Date().toISOString();
-    logActivity("import_manager_approve", i.id + " — " + i.company);
-    saveDB();
-    notify("İdxal qeydi tam təsdiqləndi ✓");
+    const imp = db.imports.find((x) => x.id === id);
+    if (!imp) return;
+    openDeadlineModal({
+      title: imp.company + " — " + imp.subject,
+      currentDeadline: imp.nextDate || imp.date,
+      onConfirm: function(newDeadline) {
+        imp.status = "Tamamlandı";
+        imp.managerApprovedAt = new Date().toISOString();
+        if (newDeadline) imp.deadline = newDeadline;
+        logActivity("import_manager_approve", imp.id + " — " + imp.company);
+        saveDB();
+        notify("İdxal qeydi tam təsdiqləndi ✓");
+      }
+    });
   };
 
   // ─── Worker Import view ───
@@ -1256,6 +1270,7 @@
       </div>
       <div class="je-meta">
         <span class="meta-tag">📅 ${fd(i.date)}</span>
+        ${i.deadline ? `<span class="meta-tag" style="color:var(--red)">⏰ Son tarix: ${fd(i.deadline)}</span>` : ""}
         ${i.nextDate ? `<span class="meta-tag">🔄 ${fd(i.nextDate)}</span>` : ""}
       </div>
       ${i.notes ? `<div class="je-note">${esc(i.notes)}</div>` : ""}
@@ -1451,6 +1466,7 @@
       <div class="je-meta">
         <span class="meta-tag">📅 ${fd(i.date)}</span>
         <span class="meta-tag">👤 ${esc(i.worker)}</span>
+        ${i.deadline ? `<span class="meta-tag" style="color:var(--red)">⏰ Son tarix: ${fd(i.deadline)}</span>` : ""}
         ${i.nextDate ? `<span class="meta-tag">🔄 ${fd(i.nextDate)}</span>` : ""}
       </div>
       ${i.notes ? `<div class="je-note">${esc(i.notes)}</div>` : ""}
@@ -1487,18 +1503,56 @@
       document.getElementById("imp-date").value = imp.date || today;
       iw.value = imp.worker;
       document.getElementById("imp-status").value = imp.status;
+      document.getElementById("imp-deadline").value = imp.deadline || "";
       document.getElementById("imp-next").value = imp.nextDate || "";
       document.getElementById("imp-notes").value = imp.notes || "";
     } else {
       document.getElementById("imp-company").value = "";
       document.getElementById("imp-subject").value = "";
       document.getElementById("imp-date").value = today;
+      document.getElementById("imp-deadline").value = "";
       document.getElementById("imp-next").value = "";
       document.getElementById("imp-notes").value = "";
     }
     document.getElementById("import-modal").style.display = "flex";
   };
-  window.closeImportModal = function () {
+  // ─── Deadline Modal ───
+  let _deadlineCallback = null;
+
+  window.openDeadlineModal = function ({ title, currentDeadline, onConfirm }) {
+    _deadlineCallback = onConfirm || null;
+    const lbl = document.getElementById("dlm-title");
+    const inp = document.getElementById("dlm-date");
+    if (lbl) lbl.textContent = title || "";
+    if (inp) {
+      // mövcud deadline-i göstər, yoxdursa bugünkü tarix
+      const today = new Date().toISOString().split("T")[0];
+      inp.value = currentDeadline ? String(currentDeadline).split("T")[0] : today;
+    }
+    document.getElementById("deadline-modal").style.display = "flex";
+  };
+
+  window.closeDeadlineModal = function () {
+    document.getElementById("deadline-modal").style.display = "none";
+    _deadlineCallback = null;
+  };
+
+  window.confirmDeadlineModal = function () {
+    const inp = document.getElementById("dlm-date");
+    const val = inp ? inp.value : "";
+    if (!val) { notify("Tarix seçin", "err"); return; }
+    const cb = _deadlineCallback;
+    closeDeadlineModal();
+    if (cb) cb(val);
+  };
+
+  window.skipDeadlineModal = function () {
+    const cb = _deadlineCallback;
+    closeDeadlineModal();
+    if (cb) cb(null);
+  };
+
+    window.closeImportModal = function () {
     document.getElementById("import-modal").style.display = "none";
   };
   window.editImport = function (id) {
@@ -1524,6 +1578,7 @@
       date: document.getElementById("imp-date").value,
       worker: document.getElementById("imp-worker").value,
       status: document.getElementById("imp-status").value,
+      deadline: document.getElementById("imp-deadline").value || "",
       nextDate: document.getElementById("imp-next").value,
       notes: document.getElementById("imp-notes").value
     };

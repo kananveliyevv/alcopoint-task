@@ -645,12 +645,28 @@ grant select, insert, update on public.alcopoint_db to authenticated;</pre>
       <div class="field"><label>Tarix</label><input type="date" id="imp-date"></div>
       <div class="field"><label>İşçi</label><select id="imp-worker"></select></div>
       <div class="field"><label>Status</label><select id="imp-status"><option>Gözləyir</option><option>Davam edir</option><option>Tamamlandı</option><option>Ləğv edildi</option></select></div>
+      <div class="field"><label>Deadline (son tarix)</label><input type="date" id="imp-deadline"></div>
       <div class="field"><label>Növbəti görüş</label><input type="date" id="imp-next"></div>
       <div class="field span2"><label>Qeydlər</label><textarea id="imp-notes" rows="3"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn" onclick="closeImportModal()">Ləğv et</button>
       <button class="btn yellow" onclick="saveImport()">Saxla</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="deadline-modal" style="display:none" onclick="if(event.target===this)closeDeadlineModal()">
+  <div class="modal" style="max-width:420px">
+    <h2>📅 Yeni Deadline Təyin Et</h2>
+    <p id="dlm-title" style="font-size:13px;color:var(--text2);margin-bottom:16px;word-break:break-word"></p>
+    <div class="field">
+      <label>Son tarix *</label>
+      <input type="date" id="dlm-date" style="width:100%">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="skipDeadlineModal()">Tarixsiz Təsdiqlə</button>
+      <button class="btn yellow" onclick="confirmDeadlineModal()">✓ Təsdiqlə</button>
     </div>
   </div>
 </div>
