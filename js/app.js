@@ -178,6 +178,7 @@
   let countdownTimer = null;
   let firebaseMode = "local";
   let firebaseConnected = false;
+  let currentTheme = "dark";
 
   // ─── Helpers ───
   function badge(s) {
@@ -278,6 +279,44 @@
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2800);
+  }
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    currentTheme = theme === "light" ? "light" : "dark";
+    root.setAttribute("data-theme", currentTheme);
+    const isLight = currentTheme === "light";
+    root.classList.toggle("theme-light", isLight);
+    root.style.colorScheme = isLight ? "light" : "dark";
+    if (document.body) {
+      document.body.setAttribute("data-theme", currentTheme);
+      document.body.classList.toggle("theme-light", isLight);
+      document.body.style.colorScheme = isLight ? "light" : "dark";
+    }
+    const btn = document.getElementById("theme-toggle-btn");
+    if (btn) {
+      btn.textContent = isLight ? "🌙 Qara rejim" : "☀️ Ağ rejim";
+    }
+    const loginIcon = document.getElementById("theme-toggle-login-icon");
+    const loginBtn = document.getElementById("theme-toggle-login");
+    if (loginIcon) loginIcon.textContent = isLight ? "🌙" : "☀️";
+    if (loginBtn) {
+      loginBtn.title = isLight ? "Qara rejimə keç" : "Ağ rejimə keç";
+      loginBtn.setAttribute("aria-label", isLight ? "Qara rejim" : "Ağ rejim");
+    }
+    try {
+      localStorage.setItem("alcopoint_theme", currentTheme);
+    } catch (_) {}
+  }
+  function loadTheme() {
+    let saved = null;
+    try {
+      saved = localStorage.getItem("alcopoint_theme");
+    } catch (_) {}
+    const prefersLight =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-color-scheme: light)").matches;
+    applyTheme(saved || (prefersLight ? "light" : "dark"));
   }
   function newTaskId() {
     const ids = db.tasks.map((t) => parseInt(t.id.replace("ALC-", ""), 10)).filter((n) => !isNaN(n));
@@ -573,6 +612,9 @@
       const src = document.getElementById("perf-panel");
       if (dst && src) dst.innerHTML = src.innerHTML;
     }
+  };
+  window.toggleTheme = function () {
+    applyTheme(currentTheme === "dark" ? "light" : "dark");
   };
 
   window.renderTasksTable = renderTasksTable;
@@ -1406,6 +1448,7 @@
   };
 
   // ─── Init ───
+  loadTheme();
   loadDB();
   populateLoginSelect();
 
