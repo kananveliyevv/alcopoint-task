@@ -84,6 +84,13 @@ html.theme-light .sidebar-logo p{display:none}
 .theme-btn{margin-bottom:8px;background:none;border:1px solid var(--border);color:var(--text2);font-size:12px;cursor:pointer;padding:7px 10px;border-radius:8px;width:100%;font-family:inherit}
 .theme-btn:hover{background:var(--bg3);color:var(--text)}
 
+.sidebar-pass{margin:8px 14px 16px;padding:14px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:12px}
+.sidebar-pass h3{font-size:12px;font-weight:600;margin-bottom:12px;color:var(--text2)}
+.sidebar-pass .field{margin-bottom:10px}
+.sidebar-pass .field label{font-size:11px}
+.sidebar-pass .field input{padding:9px 11px;font-size:13px}
+.sidebar-pass .btn-save{width:100%;margin-top:4px;padding:9px;font-size:12px}
+
 .main{margin-left:240px;padding:28px 32px;min-height:100vh}
 .page{display:none}.page.active{display:block;animation:fadeIn .2s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -336,6 +343,13 @@ input,select,textarea{color-scheme:dark}
     <div id="nav-worker" style="display:none">
       <div class="nav-section">Mənim</div>
       <div class="nav-item active" onclick="showPage('my-tasks');document.querySelector('.sidebar').classList.remove('open')" data-page="my-tasks"><span>◈</span> Tapşırıqlarım</div>
+      <div class="sidebar-pass">
+        <h3>🔐 Şifrəni dəyiş</h3>
+        <div class="field"><label>Köhnə</label><input type="password" id="my-old-pass" autocomplete="current-password"></div>
+        <div class="field"><label>Yeni</label><input type="password" id="my-new-pass" autocomplete="new-password"></div>
+        <div class="field"><label>Təkrar</label><input type="password" id="my-new-pass2" autocomplete="new-password"></div>
+        <button class="btn yellow btn-save" type="button" onclick="changeMyPass()">Yadda saxla</button>
+      </div>
     </div>
 
     <div class="sidebar-bottom">

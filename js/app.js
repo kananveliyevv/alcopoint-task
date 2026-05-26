@@ -1066,30 +1066,16 @@
     document.getElementById("my-s-late").textContent = my.filter((t) => t.status === STATUS.LATE).length;
 
     const el = document.getElementById("my-tasks-list");
-    const passBox = `
-      <div class="settings-section" style="margin-bottom:16px">
-        <h3>🔐 Şifrəni dəyiş</h3>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:520px">
-          <div class="field"><label>Köhnə</label><input type="password" id="my-old-pass"></div>
-          <div class="field"><label>Yeni</label><input type="password" id="my-new-pass"></div>
-          <div class="field" style="grid-column:span 2"><label>Təkrar</label><input type="password" id="my-new-pass2"></div>
-        </div>
-        <button class="btn yellow" style="margin-top:8px" type="button" onclick="changeMyPass()">Yadda saxla</button>
-      </div>
-    `;
 
     if (!my.length) {
       el.innerHTML =
-        passBox +
         '<div class="empty"><div class="ico">✓</div><p>Hal-hazırda tapşırığınız yoxdur</p></div>';
       return;
     }
 
     const workerStatuses = [STATUS.WAIT, STATUS.PROGRESS, STATUS.LATE];
 
-    el.innerHTML =
-      passBox +
-      my
+    el.innerHTML = my
       .map((t) => {
         const done = isDoneStatus(t.status);
         const pending = t.waitingManager || t.status === STATUS.PENDING_MANAGER;
