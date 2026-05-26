@@ -1,0 +1,29 @@
+ALCOPOINT — İş Planlaması Sistemi
+================================
+
+Düzəlişlər (son versiya):
+- İşçi "Təsdiqləndi" → status "Rəhbər baxışı gözləyir" (birbaşa tamamlanmır)
+- Rəhbər "Təsdiq Cədvəli" — yalnız waitingManager=true tapşırıqlar
+- Rəhbər "Təsdiqlə" → "Tam təsdiqləndi"
+- Duplicate "Redaktə" düyməsi aradan qaldırıldı
+- İşçi adı/şöbəsi redaktə düzgün işləyir (tapşırıqlar da yenilənir)
+- Mobil responsive menyu
+- Təsdiq gözləyənlər siyahının ən üstündə
+- Firebase Realtime Database inteqrasiyası
+- PDF export, performans paneli, deadline geri sayım
+- Bütün duplicate JS funksiyalar təmizləndi
+
+Fayl strukturu:
+- index.html          — UI
+- js/app.js           — əsas məntiq
+- js/firebase-service.js — Firebase sync
+- firebase-config.js  — Firebase config (buraya yazın)
+- logo.png            — şirkət loqosu (PDF üçün)
+
+Firebase qurulumu:
+1. firebase-config.js doldurun
+2. Realtime Database aktiv edin
+3. Parametrlər səhifəsində addımları oxuyun
+
+GitHub Pages:
+Settings → Pages → main branch → root
