@@ -91,6 +91,8 @@
     _remoteTable: null,
     _lastRemoteUpdatedAt: readCacheUpdatedAt(),
     _pollTimer: null,
+    _everConnected: false,
+    _onStatus: null,
 
     isConfigured() {
       return (
@@ -114,6 +116,11 @@
       } catch (e) {
         console.warn("Supabase saveAll error:", e);
         FirebaseService.connected = false;
+        if (FirebaseService._onStatus && FirebaseService._everConnected) {
+          FirebaseService._onStatus(
+            buildStatus({ mode: "local", connected: false, error: "Supabase bağlantısı kəsildi" })
+          );
+        }
       }
     },
 
@@ -133,23 +140,30 @@
       } catch (e) {
         console.warn("Supabase pushActivity error:", e);
         FirebaseService.connected = false;
+        if (FirebaseService._onStatus && FirebaseService._everConnected) {
+          FirebaseService._onStatus(
+            buildStatus({ mode: "local", connected: false, error: "Supabase bağlantısı kəsildi" })
+          );
+        }
       }
     },
 
     init(onRemote, onStatus) {
+      FirebaseService._onStatus = onStatus || null;
       const status = (s) => {
         try {
-          onStatus && onStatus(s);
+          FirebaseService._onStatus && FirebaseService._onStatus(s);
         } catch (_) {}
       };
 
       if (!FirebaseService.isConfigured()) {
-        status(buildStatus({ mode: "local", connected: false, error: "Supabase client yok" }));
+        // İlk açılışta “bağlantı kəsildi” gibi görünmesin: sessiz local.
+        status(buildStatus({ mode: "local", connected: false, error: null }));
         return false;
       }
 
-      // Başlangıçta local UI'yi bozmamak için connected=false ile başlıyoruz.
-      status(buildStatus({ mode: "firebase", connected: false, error: null }));
+      // Başlangıçta local görünsün; bağlantı kurulunca "firebase" moduna geçer.
+      status(buildStatus({ mode: "local", connected: false, error: null }));
 
       const run = async () => {
         // Uygun tabloyu bulmak için sırayla deneriz.
@@ -164,6 +178,7 @@
               // onRemote callback'e gönderecek bir şey yoksa db'yi app.js kendi defaultundan alıyor.
               // Bu nedenle sadece connected=true yapıp, sonraki saveAll poll ile tabloya yazacağız.
               FirebaseService.connected = true;
+              FirebaseService._everConnected = true;
               FirebaseService._lastRemoteUpdatedAt = null;
               status(buildStatus({ mode: "firebase", connected: true, error: null }));
               FirebaseService.initDone = true;
@@ -175,6 +190,7 @@
             writeCache(remote.data, remote.updated_at || null);
             FirebaseService._lastRemoteUpdatedAt = remote.updated_at || null;
             FirebaseService.connected = true;
+            FirebaseService._everConnected = true;
             status(buildStatus({ mode: "firebase", connected: true, error: null }));
 
             // Remote snapshot'ı app'e ver.
@@ -187,13 +203,8 @@
         }
 
         FirebaseService.connected = false;
-        status(
-          buildStatus({
-            mode: "local",
-            connected: false,
-            error: lastErr ? lastErr.message || String(lastErr) : "Unknown table error",
-          })
-        );
+        // İlk bağlanma başarısızsa “connection lost” uyarısı spam olmasın.
+        status(buildStatus({ mode: "local", connected: false, error: FirebaseService._everConnected ? (lastErr ? (lastErr.message || String(lastErr)) : "Supabase error") : null }));
       };
 
       // init async ama app.js bunu await etmiyor.
