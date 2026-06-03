@@ -65,5 +65,7 @@ root.render(
     checkConfig()
       ? h(AuthProvider, null, h(App))
       : h(ConfigError),
+    import { initRealtimeNotifications } from './realtimeNotifications';
+initRealtimeNotifications();
   ),
 );
