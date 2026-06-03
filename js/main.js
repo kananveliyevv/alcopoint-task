@@ -57,7 +57,6 @@ function App() {
   return h(AppShell);
 }
 
-// 60-cı sətrin yaxınına — Bootstrap bölməsinə
 const root = createRoot(document.getElementById('root'));
 
 root.render(
@@ -67,13 +66,5 @@ root.render(
       : h(ConfigError),
   ),
 );
-initRealtimeNotifications();
-const root = createRoot(document.getElementById('root'));
 
-root.render(
-  h(PrefsProvider, null,
-    checkConfig()
-      ? h(AuthProvider, null, h(App))
-      : h(ConfigError), 
-  ),
-);
+initRealtimeNotifications();
