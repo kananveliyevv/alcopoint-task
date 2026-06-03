@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AlertCircle } from 'lucide-react';
-
+import { initRealtimeNotifications } from './realtimeNotifications';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { AuthProvider, PrefsProvider }      from './contexts.js';
 import { useAuth, usePrefs }               from './contexts.js';
@@ -57,7 +57,7 @@ function App() {
   return h(AppShell);
 }
 
-// ── Bootstrap ─────────────────────────────────────────────
+// 60-cı sətrin yaxınına — Bootstrap bölməsinə
 const root = createRoot(document.getElementById('root'));
 
 root.render(
@@ -65,7 +65,15 @@ root.render(
     checkConfig()
       ? h(AuthProvider, null, h(App))
       : h(ConfigError),
-    import { initRealtimeNotifications } from './realtimeNotifications';
+  ),
+);
 initRealtimeNotifications();
+const root = createRoot(document.getElementById('root'));
+
+root.render(
+  h(PrefsProvider, null,
+    checkConfig()
+      ? h(AuthProvider, null, h(App))
+      : h(ConfigError), 
   ),
 );
