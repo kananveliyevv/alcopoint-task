@@ -65,7 +65,7 @@ export function AuthPage() {
       h('div', { className: 'relative flex items-center justify-between' },
         h('div', { className: 'flex items-center gap-2.5' },
           h(LogoMark),
-          h('span', { className: 'text-xl font-semibold tracking-tight' }, 'NextTaskX'),
+          h('span', { className: 'text-xl font-semibold tracking-tight' }, 'Alcopoint-Task'),
         ),
         h(PrefsToggle),
       ),
@@ -88,7 +88,7 @@ export function AuthPage() {
         // mobile logo
         h('div', { className: 'lg:hidden flex items-center gap-2.5 mb-10' },
           h(LogoMark, { size: 'sm' }),
-          h('span', { className: 'text-lg font-semibold' }, 'NextTaskX'),
+          h('span', { className: 'text-lg font-semibold' }, 'Alcopoint-Task'),
         ),
         // heading
         h('div', { className: 'mb-8' },

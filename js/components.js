@@ -160,17 +160,17 @@ export function Modal({ open, onClose, children, size = 'md' }) {
 // Alcopoint-Task logosu: logo.png faylını göstərir.
 export function LogoMark({ size = 'md' }) {
   const [imgFailed, setImgFailed] = useState(false);
-  const dim = size === 'sm' ? 'w-7 h-7' : 'w-9 h-9';
+  const dim = size === 'sm' ? 'w-9 h-9' : 'w-11 h-11';
   const inner = size === 'sm' ? 'w-2.5 h-2.5' : 'w-3 h-3';
 
   if (!imgFailed) {
     return h(
       'div',
-      { className: cn(dim, 'flex-shrink-0 rounded-lg overflow-hidden') },
+      { className: cn(dim, 'flex-shrink-0') },
       h('img', {
         src: 'logo.png',
         alt: 'Alcopoint-Task',
-        className: 'logo-img w-full h-full object-cover',
+        className: 'logo-img w-full h-full object-contain',
         onError: () => setImgFailed(true),
       }),
     );
