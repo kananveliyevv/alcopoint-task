@@ -41,9 +41,10 @@ export function AuthPage() {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          const { error: pErr } = await supabase.from('profiles').insert({
+          // XƏTA HƏLLİ: .insert yerinə .upsert istifadə olundu
+          const { error: pErr } = await supabase.from('profiles').upsert({
             id: data.user.id, full_name: fullName, username: clean,
-          });
+          }, { onConflict: 'id' });
           if (pErr) throw pErr;
         }
       }
@@ -244,9 +245,10 @@ export function CompleteProfile() {
     e.preventDefault(); setErr(''); setBusy(true);
     try {
       const clean = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
-      const { error } = await supabase.from('profiles').insert({
+      // XƏTA HƏLLİ: Sizin şəkildə görünən ekranın əsas problemi buradakı .insert funksiyası idi. .upsert ilə əvəzləndi.
+      const { error } = await supabase.from('profiles').upsert({
         id: session.user.id, full_name: fullName, username: clean,
-      });
+      }, { onConflict: 'id' });
       if (error) throw error;
       refreshProfile();
     } catch (ex) { setErr(ex.message); } finally { setBusy(false); }
