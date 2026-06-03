@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AlertCircle } from 'lucide-react';
-import { initRealtimeNotifications } from './realtimeNotifications';
+import { initRealtimeNotifications } from './realtimeNotifications.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 import { AuthProvider, PrefsProvider }      from './contexts.js';
 import { useAuth, usePrefs }               from './contexts.js';
