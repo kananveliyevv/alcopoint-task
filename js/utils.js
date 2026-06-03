@@ -10,18 +10,26 @@ export const cn = (...classes) => classes.filter(Boolean).join(' ');
 export const generateCode = () =>
   Math.random().toString(36).substring(2, 8).toUpperCase();
 
-/** Format date for display */
-export const formatDate = (d, lang = 'az') => {
+/** Format date for display — GG.AA.İL */
+export const formatDate = (d) => {
   if (!d) return null;
-  return new Date(d).toLocaleDateString(lang === 'az' ? 'az-AZ' : 'en-US', {
-    day: '2-digit', month: 'short',
-  });
+  const date = new Date(d);
+  const day   = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year  = date.getFullYear();
+  return `${day}.${month}.${year}`;
 };
 
-/** Format datetime for display */
-export const formatDateTime = (d, lang = 'az') => {
+/** Format datetime for display — GG.AA.İL SS:DD */
+export const formatDateTime = (d) => {
   if (!d) return '';
-  return new Date(d).toLocaleString(lang === 'az' ? 'az-AZ' : 'en-US');
+  const date = new Date(d);
+  const day   = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year  = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const mins  = String(date.getMinutes()).padStart(2, '0');
+  return `${day}.${month}.${year} ${hours}:${mins}`;
 };
 
 /** Initials from full name */

@@ -81,7 +81,7 @@ export const translations = {
     confirmRemoveMember: 'Bu üzvü çıxarmaq istədiyinizdən əminsiniz?',
     created: 'Yaradan', mins: 'dəq', hrs: 'saat',
     light: 'Açıq', dark: 'Tünd', lang_az: 'Azərbaycan', lang_en: 'English',
-    footer: 'Created by Abulfaz Mustafazade',
+    footer: 'Created by Kanan Valiyev',
     teamMembers: 'Komanda üzvləri', signOut: 'Çıxış',
   },
   en: {
@@ -162,7 +162,7 @@ export const translations = {
     confirmRemoveMember: 'Are you sure you want to remove this member?',
     created: 'Created by', mins: 'min', hrs: 'h',
     light: 'Light', dark: 'Dark', lang_az: 'Azərbaycan', lang_en: 'English',
-    footer: 'Created by Abulfaz Mustafazade',
+    footer: 'Created by Kanan Valiyev',
     teamMembers: 'Team members', signOut: 'Sign out',
   },
 };
