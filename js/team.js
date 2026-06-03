@@ -88,17 +88,28 @@ export function TeamView({ team, onTeamUpdate }) {
 
   // Realtime
   useEffect(() => {
+useEffect(() => {
     const ch = supabase.channel(`team-${team.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks',                    filter: `team_id=eq.${team.id}` }, loadData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_approval_requests',   filter: `team_id=eq.${team.id}` }, loadData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members',             filter: `team_id=eq.${team.id}` }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks',
+        filter: `team_id=eq.${team.id}` }, loadData)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'task_approval_requests',
+        filter: `team_id=eq.${team.id}` }, (payload) => {
+          loadData();
+          if (isLeader && Notification.permission === 'granted') {
+            new Notification('Yeni Təsdiq Tələbi', {
+              body: 'İşçi tapşırıq statusunu dəyişmək istəyir',
+              icon: '/logo.png',
+              tag: `approval-${payload.new.id}`,
+            });
+          }
+        })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'task_approval_requests',
+        filter: `team_id=eq.${team.id}` }, loadData)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'team_members',
+        filter: `team_id=eq.${team.id}` }, loadData)
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [team.id, loadData]);
-
-  const filteredTasks = useMemo(() => tasks.filter(task => {
-    if (search && !task.title.toLowerCase().includes(search.toLowerCase()) &&
-        !(task.description || '').toLowerCase().includes(search.toLowerCase())) return false;
+  }, [team.id, loadData, isLeader]);
     if (filterStatus   !== 'all' && task.status   !== filterStatus)   return false;
     if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
     if (filterAssignee !== 'all') {
