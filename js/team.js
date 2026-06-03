@@ -108,7 +108,8 @@ useEffect(() => {
         filter: `team_id=eq.${team.id}` }, loadData)
       .subscribe();
     return () => supabase.removeChannel(ch);
-  }, [team.id, loadData, isLeader]);
+}, [team.id, loadData, isLeader]);
+  const filteredTasks = useMemo(() => tasks.filter(task => {
     if (filterStatus   !== 'all' && task.status   !== filterStatus)   return false;
     if (filterPriority !== 'all' && task.priority !== filterPriority) return false;
     if (filterAssignee !== 'all') {
