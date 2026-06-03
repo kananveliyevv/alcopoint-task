@@ -87,7 +87,6 @@ export function TeamView({ team, onTeamUpdate }) {
   useEffect(() => { loadData(); }, [loadData]);
 
   // Realtime
-  useEffect(() => {
 useEffect(() => {
     const ch = supabase.channel(`team-${team.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks',
