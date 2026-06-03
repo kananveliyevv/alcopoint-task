@@ -253,6 +253,11 @@ function NewTeamForm({ onClose, onDone }) {
           name, description: desc, team_code: generateCode(), created_by: profile.id,
         }).select().single();
         if (error) throw error;
+        // Yaradanı leader kimi team_members-ə əlavə et
+        const { error: mErr } = await supabase.from('team_members').insert({
+          team_id: data.id, user_id: profile.id, role: 'leader',
+        });
+        if (mErr) throw mErr;
         onDone(data.id);
       } else {
         const { data: team, error } = await supabase.from('teams').select('id').eq('team_code', code.toUpperCase()).maybeSingle();
